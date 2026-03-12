@@ -261,6 +261,8 @@ local function buildShop(baseModel, basePosition)
 
 			money.Value = money.Value - cost
 			applyBoost(humanoid)
+			-- Persist the new WalkSpeed / JumpPower so they survive respawn / rejoin
+			GameSystems.updateSettings(player, humanoid.WalkSpeed, humanoid.JumpPower)
 		end)
 	end
 
