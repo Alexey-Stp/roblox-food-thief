@@ -397,6 +397,49 @@ local function buildLobby(parent, cx, cy, cz)
 end
 
 -- -------------------------------------------------------------------------
+-- Decorative tree at a given world position
+-- -------------------------------------------------------------------------
+local function buildTree(parent, position)
+	local trunk = Instance.new("Part")
+	trunk.Name      = "TreeTrunk"
+	trunk.Shape     = Enum.PartType.Cylinder
+	trunk.Size      = Vector3.new(8, 3, 3)
+	trunk.CFrame    = CFrame.new(position + Vector3.new(0, 4, 0))
+		* CFrame.Angles(0, 0, math.rad(90))
+	trunk.Anchored  = true
+	trunk.BrickColor = BrickColor.new("Reddish brown")
+	trunk.Material  = Enum.Material.Wood
+	trunk.Parent    = parent
+
+	local foliage = Instance.new("Part")
+	foliage.Name     = "TreeFoliage"
+	foliage.Shape    = Enum.PartType.Ball
+	foliage.Size     = Vector3.new(14, 14, 14)
+	foliage.Position = position + Vector3.new(0, 12, 0)
+	foliage.Anchored = true
+	foliage.BrickColor = BrickColor.new("Bright green")
+	foliage.Material = Enum.Material.Grass
+	foliage.Parent   = parent
+end
+
+-- -------------------------------------------------------------------------
+-- Trees scattered around the outside of the restaurant
+-- -------------------------------------------------------------------------
+local function buildRestaurantTrees(parent, Config)
+	local cx  = Config.HOTEL_CENTER.X
+	local cz  = Config.HOTEL_CENTER.Z
+	local hw  = Config.HOTEL_SIZE.X / 2 + 30  -- outside the walls
+
+	-- 12 trees evenly spaced in a ring around the restaurant
+	for i = 1, 12 do
+		local angle = (math.pi * 2 / 12) * i
+		local tx    = cx + math.cos(angle) * hw
+		local tz    = cz + math.sin(angle) * hw
+		buildTree(parent, Vector3.new(tx, 0.5, tz))
+	end
+end
+
+-- -------------------------------------------------------------------------
 -- Main build entry point
 -- -------------------------------------------------------------------------
 function RestaurantBuilder.build(Config)
@@ -521,6 +564,9 @@ function RestaurantBuilder.build(Config)
 	local liftWX  = cx - hw + 25
 	createFloorDoor(Vector3.new(liftEX, cy + fh + 10, cz - 8),      0, hotel, "LiftDoor_F1E", Config.DOOR_DEBOUNCE)
 	createFloorDoor(Vector3.new(liftWX, cy + fh * 2 + 10, cz - 8),  0, hotel, "LiftDoor_F2W", Config.DOOR_DEBOUNCE)
+
+	-- Decorative trees around the restaurant exterior
+	buildRestaurantTrees(hotel, Config)
 
 	-- Tables and food spawn positions per floor
 	local floorFoodPositions = {}
