@@ -20,6 +20,7 @@ local RestaurantBuilder = safeRequire(modules.RestaurantBuilder, "RestaurantBuil
 local FoodSystem        = safeRequire(modules.FoodSystem,        "FoodSystem")
 local EnemyAI           = safeRequire(modules.EnemyAI,           "EnemyAI")
 local BaseBuilder       = safeRequire(modules.BaseBuilder,       "BaseBuilder")
+local DayNight          = safeRequire(modules.DayNight,          "DayNight")
 
 -- 1. Init scoring and DataStore first (players may have already joined)
 GameSystems.init(Config)
@@ -63,3 +64,7 @@ for level = 1, Config.FLOOR_COUNT do
 end
 
 print("[Main] Game ready!")
+
+-- 5. Start day/night cycle
+print("[Main] Starting day/night cycle...")
+DayNight.start(Config.DAY_LENGTH)
