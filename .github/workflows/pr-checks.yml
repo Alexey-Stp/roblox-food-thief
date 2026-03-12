@@ -6,6 +6,9 @@ on:
   push:
     branches-ignore: [main]   # also run on feature branches before a PR is opened
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # -----------------------------------------------------------------------
   # Job 1 — Validate that the Rojo project compiles without errors

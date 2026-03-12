@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:   # also allow manual trigger from the GitHub Actions UI
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   publish:
     runs-on: ubuntu-latest
