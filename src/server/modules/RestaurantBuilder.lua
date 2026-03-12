@@ -12,6 +12,9 @@ local doorCooldowns = {}
 -- Lift debounce timestamps (keyed by Platform Part)
 local liftCooldowns = {}
 
+-- All indoor PointLight instances — toggled by the light switch in the lobby
+local indoorLights = {}
+
 -- Table colours per floor (module-level constant)
 local TABLE_COLORS = {
 	BrickColor.new("Dark orange"),    -- Floor 1
@@ -20,21 +23,7 @@ local TABLE_COLORS = {
 }
 
 -- -------------------------------------------------------------------------
--- Ground / Baseplate
--- -------------------------------------------------------------------------
-local function buildGround(Config)
-	local ground = Instance.new("Part")
-	ground.Name       = "Ground"
-	ground.Size       = Config.GROUND_SIZE
-	ground.Position   = Vector3.new(0, -Config.GROUND_SIZE.Y / 2, 0)
-	ground.Anchored   = true
-	ground.BrickColor = BrickColor.new("Bright green")
-	ground.Material   = Enum.Material.Grass
-	ground.Parent     = workspace
-end
-
--- -------------------------------------------------------------------------
--- SurfaceGui label helper
+-- SurfaceGui label helper  (declared early so later helpers can use it)
 -- -------------------------------------------------------------------------
 local function addLabel(part, face, text, textColor)
 	local gui = Instance.new("SurfaceGui")
@@ -49,6 +38,299 @@ local function addLabel(part, face, text, textColor)
 	lbl.Font                   = Enum.Font.SourceSansBold
 	lbl.Parent                 = gui
 	return lbl
+end
+
+-- -------------------------------------------------------------------------
+-- Indoor ceiling lighting
+-- Creates a 3×3 grid of PointLights per floor so the interior stays bright
+-- regardless of the outdoor Lighting settings (ClockTime/ambient changes).
+-- All lights are registered in the module-level `indoorLights` table so the
+-- lobby light-switch can toggle them at runtime.
+-- -------------------------------------------------------------------------
+local function buildIndoorLighting(parent, Config)
+	local cx = Config.HOTEL_CENTER.X
+	local cz = Config.HOTEL_CENTER.Z
+	local cy = Config.HOTEL_CENTER.Y
+	local fh = Config.FLOOR_HEIGHT
+
+	-- Spread 3 lights evenly per axis across the 340-stud interior
+	local offsets = { -70, 0, 70 }
+
+	for f = 1, Config.FLOOR_COUNT do
+		-- Hang lights just below the ceiling slab of the floor above
+		local ceilY = cy + f * fh - 2
+
+		for _, dx in ipairs(offsets) do
+			for _, dz in ipairs(offsets) do
+				local anchor = Instance.new("Part")
+				anchor.Name         = "CeilingLight_F" .. f
+				anchor.Size         = Vector3.new(2, 0.4, 2)
+				anchor.Position     = Vector3.new(cx + dx, ceilY, cz + dz)
+				anchor.Anchored     = true
+				anchor.CanCollide   = false
+				anchor.BrickColor   = BrickColor.new("Bright yellow")
+				anchor.Material     = Enum.Material.Neon
+				anchor.Transparency = 0.4
+				anchor.Parent       = parent
+
+				local light = Instance.new("PointLight")
+				light.Brightness = 12
+				light.Range      = 90   -- wide enough to overlap with adjacent lights
+				light.Color      = Color3.fromRGB(255, 245, 215)  -- warm white
+				light.Parent     = anchor
+
+				table.insert(indoorLights, light)
+			end
+		end
+	end
+end
+
+-- -------------------------------------------------------------------------
+-- Lobby light-switch: ProximityPrompt that toggles all indoor lights on/off.
+-- Default = on (lights always bright).
+-- -------------------------------------------------------------------------
+local function buildLightSwitch(parent, Config)
+	local cx = Config.HOTEL_CENTER.X
+	local cy = Config.HOTEL_CENTER.Y
+	local rz = Config.HOTEL_SIZE.Z
+
+	-- Place the switch on the south interior wall near the main entrance
+	local switch = Instance.new("Part")
+	switch.Name      = "LightSwitch"
+	switch.Size      = Vector3.new(1.5, 2, 0.5)
+	switch.Position  = Vector3.new(cx - 18, cy + 5, -rz / 2 + 4)
+	switch.Anchored  = true
+	switch.BrickColor = BrickColor.new("Bright green")
+	switch.Material  = Enum.Material.Neon
+	switch.Parent    = parent
+
+	local gui = Instance.new("SurfaceGui")
+	gui.Face   = Enum.NormalId.Front
+	gui.Parent = switch
+	local lbl = Instance.new("TextLabel")
+	lbl.Size                   = UDim2.new(1, 0, 1, 0)
+	lbl.Text                   = "💡"
+	lbl.BackgroundTransparency = 1
+	lbl.TextScaled             = true
+	lbl.Parent                 = gui
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText            = "Turn Off Lights"
+	prompt.ObjectText            = "Light Switch"
+	prompt.KeyboardKeyCode       = Enum.KeyCode.E
+	prompt.MaxActivationDistance = 8
+	prompt.Parent                = switch
+
+	local lightsOn = true
+	prompt.Triggered:Connect(function()
+		lightsOn = not lightsOn
+		for _, light in ipairs(indoorLights) do
+			light.Enabled = lightsOn
+		end
+		switch.BrickColor = lightsOn
+			and BrickColor.new("Bright green")
+			or  BrickColor.new("Dark grey")
+		prompt.ActionText = lightsOn and "Turn Off Lights" or "Turn On Lights"
+	end)
+end
+
+-- -------------------------------------------------------------------------
+-- Staircase between two floor levels
+-- Builds 13 steps (each 2 studs tall × 2 studs deep) climbing ~26 studs while
+-- advancing in the X direction.  Neon railings mark edges for visibility.
+--   parent     : Model to parent all parts into
+--   name       : prefix for part names
+--   startX     : world X of first (lowest) step
+--   startY     : world Y of the bottom of the first step
+--   startZ     : world Z centre of the staircase (constant)
+--   dirX       : +1 → steps advance eastward, -1 → westward
+--   stepWidth  : Z extent of each step (the "width" perpendicular to travel)
+-- -------------------------------------------------------------------------
+local function buildStaircase(parent, name, startX, startY, startZ, dirX, stepWidth)
+	local STEP_COUNT  = 13
+	local STEP_HEIGHT = 2     -- studs per step vertically
+	local STEP_DEPTH  = 2     -- studs per step horizontally
+	local STEP_MAT    = Enum.Material.Metal
+	local STEP_COLOR  = BrickColor.new("Medium stone grey")
+	local GLOW_COLOR  = Color3.fromRGB(80, 190, 255)
+	local RAIL_COLOR  = BrickColor.new("Bright yellow")
+
+	-- Build individual steps
+	for i = 0, STEP_COUNT - 1 do
+		local step = Instance.new("Part")
+		step.Name      = name .. "_Step" .. (i + 1)
+		step.Size      = Vector3.new(STEP_DEPTH, STEP_HEIGHT, stepWidth)
+		step.Position  = Vector3.new(
+			startX + dirX * (i * STEP_DEPTH + STEP_DEPTH / 2),
+			startY + i * STEP_HEIGHT + STEP_HEIGHT / 2,
+			startZ
+		)
+		step.Anchored  = true
+		step.BrickColor = STEP_COLOR
+		step.Material  = STEP_MAT
+		step.Parent    = parent
+
+		-- Subtle neon glow on the front face for visibility at night
+		local glow = Instance.new("SurfaceLight")
+		glow.Face       = dirX > 0 and Enum.NormalId.Left or Enum.NormalId.Right
+		glow.Brightness = 2
+		glow.Range      = 6
+		glow.Color      = GLOW_COLOR
+		glow.Parent     = step
+	end
+
+	-- Helper to build a diagonal rail along one Z edge of the staircase
+	local function makeRail(zOffset)
+		local railStartPos = Vector3.new(
+			startX,
+			startY + STEP_COUNT * STEP_HEIGHT + 2,
+			startZ + zOffset
+		)
+		local railEndPos = Vector3.new(
+			startX + dirX * STEP_COUNT * STEP_DEPTH,
+			startY + STEP_COUNT * STEP_HEIGHT + 2,
+			startZ + zOffset
+		)
+		local midPos = (railStartPos + railEndPos) * 0.5
+		local len    = (railEndPos - railStartPos).Magnitude
+
+		local rail = Instance.new("Part")
+		rail.Name      = name .. "_Rail_" .. tostring(zOffset)
+		rail.Size      = Vector3.new(0.3, 0.3, len)
+		rail.CFrame    = CFrame.new(midPos, railEndPos)
+		rail.Anchored  = true
+		rail.BrickColor = RAIL_COLOR
+		rail.Material  = Enum.Material.Neon
+		rail.Parent    = parent
+
+		-- Vertical posts every 3 steps
+		for i = 0, STEP_COUNT - 1, 3 do
+			local post = Instance.new("Part")
+			post.Name      = name .. "_Post" .. i .. "_" .. tostring(zOffset)
+			post.Size      = Vector3.new(0.4, 4, 0.4)
+			post.Position  = Vector3.new(
+				startX + dirX * i * STEP_DEPTH,
+				startY + i * STEP_HEIGHT + 2,
+				startZ + zOffset
+			)
+			post.Anchored  = true
+			post.BrickColor = BrickColor.new("Dark stone grey")
+			post.Material  = Enum.Material.Metal
+			post.Parent    = parent
+		end
+	end
+
+	makeRail(-(stepWidth / 2 + 0.5))
+	makeRail( (stepWidth / 2 + 0.5))
+end
+
+-- -------------------------------------------------------------------------
+-- Parkour platforms and jump pads between floors
+-- Adds floating platforms at intermediate heights plus neon jump pads that
+-- launch players upward by one floor.
+-- -------------------------------------------------------------------------
+local function buildParkourElements(parent, Config)
+	local cx = Config.HOTEL_CENTER.X
+	local cz = Config.HOTEL_CENTER.Z
+	local cy = Config.HOTEL_CENTER.Y
+	local fh = Config.FLOOR_HEIGHT
+
+	-- Helper: create a floating platform
+	local function makePlatform(px, py, pz, sx, sz, color)
+		local plat = Instance.new("Part")
+		plat.Name      = "ParkourPlatform"
+		plat.Size      = Vector3.new(sx, 1, sz)
+		plat.Position  = Vector3.new(px, py, pz)
+		plat.Anchored  = true
+		plat.BrickColor = color or BrickColor.new("Dark stone grey")
+		plat.Material  = Enum.Material.SmoothPlastic
+		plat.Parent    = parent
+	end
+
+	-- Helper: create a neon jump pad that launches players vertically
+	-- launchVelocity: upward studs/sec (≈ 100 reaches one floor up)
+	local function makeJumpPad(px, py, pz, launchVelocity)
+		local pad = Instance.new("Part")
+		pad.Name      = "JumpPad"
+		pad.Size      = Vector3.new(5, 0.5, 5)
+		pad.Position  = Vector3.new(px, py, pz)
+		pad.Anchored  = true
+		pad.BrickColor = BrickColor.new("Bright green")
+		pad.Material  = Enum.Material.Neon
+		pad.Parent    = parent
+
+		addLabel(pad, Enum.NormalId.Top, "⬆ JUMP", Color3.new(0, 0, 0))
+
+		-- Apply upward velocity to any player that touches the pad
+		pad.Touched:Connect(function(hit)
+			local char = hit.Parent
+			if not char then return end
+			local humanoid = char:FindFirstChildOfClass("Humanoid")
+			if not humanoid or humanoid.Health <= 0 then return end
+			local root = char:FindFirstChild("HumanoidRootPart")
+			if not root then return end
+			-- Use AssemblyLinearVelocity to launch the player upward
+			root.AssemblyLinearVelocity = Vector3.new(
+				root.AssemblyLinearVelocity.X,
+				launchVelocity,
+				root.AssemblyLinearVelocity.Z
+			)
+		end)
+	end
+
+	-- ── Platforms + jump pads between Floor 1 and Floor 2 ────────────────
+	-- Heights: F1 floor ≈ cy+0.5, F2 floor ≈ cy+25.5
+	local f1Base = cy + 0.5
+	local f2Base = cy + fh + 0.5
+
+	-- Platforms in the western interior area
+	makePlatform(cx - 60, f1Base + 7,  cz - 40, 10, 8)
+	makePlatform(cx - 80, f1Base + 14, cz - 10, 8,  8)
+	makePlatform(cx - 55, f1Base + 21, cz + 30, 10, 8)
+
+	-- Jump pad on the F1 ground that launches to the first platform
+	makeJumpPad(cx - 60, f1Base + 1, cz - 40, 50)
+
+	-- ── Platforms + jump pads between Floor 2 and Floor 3 ────────────────
+	local f3Base = cy + 2 * fh + 0.5
+
+	-- Platforms in the eastern interior area
+	makePlatform(cx + 60, f2Base + 7,  cz + 40, 10, 8)
+	makePlatform(cx + 80, f2Base + 14, cz + 10, 8,  8)
+	makePlatform(cx + 55, f2Base + 21, cz - 30, 10, 8)
+
+	-- Jump pad on the F2 slab that launches to the first platform
+	makeJumpPad(cx + 60, f2Base + 1, cz + 40, 50)
+
+	-- Crates as decorative obstacles / stepping stones (F1 area)
+	local CRATE_COLOR = BrickColor.new("Reddish brown")
+	for i = 1, 4 do
+		local angle = (math.pi / 2) * i + math.pi / 4
+		local cx2   = cx + math.cos(angle) * 110
+		local cz2   = cz + math.sin(angle) * 110
+		local crate = Instance.new("Part")
+		crate.Name      = "Crate_F1_" .. i
+		crate.Size      = Vector3.new(3, 3, 3)
+		crate.Position  = Vector3.new(cx2, f1Base + 2, cz2)
+		crate.Anchored  = true
+		crate.BrickColor = CRATE_COLOR
+		crate.Material  = Enum.Material.Wood
+		crate.Parent    = parent
+	end
+end
+
+-- -------------------------------------------------------------------------
+-- Ground / Baseplate
+-- -------------------------------------------------------------------------
+local function buildGround(Config)
+	local ground = Instance.new("Part")
+	ground.Name       = "Ground"
+	ground.Size       = Config.GROUND_SIZE
+	ground.Position   = Vector3.new(0, -Config.GROUND_SIZE.Y / 2, 0)
+	ground.Anchored   = true
+	ground.BrickColor = BrickColor.new("Bright green")
+	ground.Material   = Enum.Material.Grass
+	ground.Parent     = workspace
 end
 
 -- -------------------------------------------------------------------------
@@ -573,6 +855,38 @@ function RestaurantBuilder.build(Config)
 	for f = 1, Config.FLOOR_COUNT do
 		floorFoodPositions[f] = buildTablesForFloor(hotel, f, Config)
 	end
+
+	-- Indoor ceiling lighting (keeps interior bright at night)
+	buildIndoorLighting(hotel, Config)
+
+	-- Lobby light-switch (toggles all indoor lights on/off)
+	buildLightSwitch(hotel, Config)
+
+	-- Staircases along interior walls between floors
+	-- F1 → F2: north interior area, heading east (+X direction), wide steps facing south
+	buildStaircase(
+		hotel,
+		"Stairs_F1_F2",
+		cx - 50,          -- startX (west end)
+		cy + 0.5,         -- startY (F1 floor)
+		cz + 130,         -- startZ (near north interior wall)
+		1,                -- dirX = +1 → ascending eastward
+		12                -- step width in Z
+	)
+
+	-- F2 → F3: south interior area, heading west (−X direction)
+	buildStaircase(
+		hotel,
+		"Stairs_F2_F3",
+		cx + 50,          -- startX (east end)
+		cy + fh + 0.5,    -- startY (F2 floor)
+		cz - 130,         -- startZ (near south interior wall)
+		-1,               -- dirX = −1 → ascending westward
+		12                -- step width in Z
+	)
+
+	-- Parkour platforms and jump pads between floors
+	buildParkourElements(hotel, Config)
 
 	return hotel, floorFoodPositions
 end
