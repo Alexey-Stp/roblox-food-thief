@@ -47,7 +47,7 @@ jobs:
         run: |
           HTTP_CODE=$(curl --silent --output response.json --write-out "%{http_code}" \
             -X POST \
-            "https://apis.roblox.com/universes/v1/${{ secrets.ROBLOX_UNIVERSE_ID }}/places/${{ secrets.ROBLOX_PLACE_ID }}/versions" \
+            "https://apis.roblox.com/universes/v1/${{ secrets.ROBLOX_UNIVERSE_ID }}/places/${{ secrets.ROBLOX_PLACE_ID }}/versions?versionType=Published" \
             -H "x-api-key: ${{ secrets.ROBLOX_API_KEY }}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @game.rbxl)
