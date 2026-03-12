@@ -1,0 +1,90 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Rojo: Serve",
+            "type": "shell",
+            "command": "${workspaceFolder}\\rojo.exe",
+            "args": [
+                "serve",
+                "default.project.json"
+            ],
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "Rojo: Build",
+            "type": "shell",
+            "command": "${workspaceFolder}\\rojo.exe",
+            "args": [
+                "build",
+                "default.project.json",
+                "--output",
+                "game.rbxl"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Rojo: Build (rbxlx)",
+            "type": "shell",
+            "command": "${workspaceFolder}\\rojo.exe",
+            "args": [
+                "build",
+                "default.project.json",
+                "--output",
+                "game.rbxlx"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "group": "build"
+        },
+        {
+            "label": "Rojo: Init",
+            "type": "shell",
+            "command": "${workspaceFolder}\\rojo.exe",
+            "args": [
+                "init"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        }
+    ]
+}

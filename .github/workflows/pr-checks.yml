@@ -1,0 +1,85 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches-ignore: [main]   # also run on feature branches before a PR is opened
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Job 1 — Validate that the Rojo project compiles without errors
+  # -----------------------------------------------------------------------
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rojo
+        run: |
+          curl -fsSL \
+            "https://github.com/rojo-rbx/rojo/releases/download/v7.4.4/rojo-7.4.4-linux-x86_64.zip" \
+            -o rojo.zip
+          unzip rojo.zip
+          chmod +x rojo
+          sudo mv rojo /usr/local/bin/rojo
+          rojo --version
+
+      - name: Build place (validation only)
+        # Output to /dev/null so no artifact is stored
+        run: rojo build default.project.json -o /dev/null
+
+  # -----------------------------------------------------------------------
+  # Job 2 — Selene static analysis (Lua linter)
+  # -----------------------------------------------------------------------
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Selene
+        run: |
+          curl -fsSL \
+            "https://github.com/Kampfkarren/selene/releases/download/0.27.1/selene-0.27.1-linux.zip" \
+            -o selene.zip
+          unzip selene.zip
+          chmod +x selene
+          sudo mv selene /usr/local/bin/selene
+          selene --version
+
+      - name: Download Roblox standard library definitions
+        run: |
+          curl -fsSL \
+            "https://github.com/Kampfkarren/selene/releases/download/0.27.1/roblox.yml" \
+            -o roblox.yml
+
+      - name: Lint Lua sources
+        run: selene src/
+
+  # -----------------------------------------------------------------------
+  # Job 3 — StyLua format check
+  # -----------------------------------------------------------------------
+  format:
+    name: format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install StyLua
+        run: |
+          curl -fsSL \
+            "https://github.com/JohnnyMorganz/StyLua/releases/download/v0.20.0/stylua-linux-x86_64.zip" \
+            -o stylua.zip
+          unzip stylua.zip
+          chmod +x stylua
+          sudo mv stylua /usr/local/bin/stylua
+          stylua --version
+
+      - name: Check formatting
+        # Exits non-zero if any file differs from the formatted output
+        run: stylua --check src/

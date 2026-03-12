@@ -1,0 +1,6 @@
+[selene]
+standard_library = "roblox"
+
+[rules]
+# Allow unused variables prefixed with _ (Lua convention)
+unused_variable = { allow_unused_self = true }

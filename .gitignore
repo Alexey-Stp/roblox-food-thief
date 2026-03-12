@@ -1,0 +1,15 @@
+# Rojo build artifacts
+*.rbxl
+*.rbxlx
+*.session.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/settings.json
+
+# Node tooling (if added later)
+node_modules/

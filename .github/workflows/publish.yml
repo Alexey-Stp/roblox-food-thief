@@ -1,0 +1,62 @@
+name: Publish to Roblox
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # also allow manual trigger from the GitHub Actions UI
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # Install Rojo (pinned version for reproducible builds)
+      # To upgrade: change the version number in both the URL and directory name
+      # -----------------------------------------------------------------------
+      - name: Install Rojo
+        run: |
+          curl -fsSL \
+            "https://github.com/rojo-rbx/rojo/releases/download/v7.4.4/rojo-7.4.4-linux-x86_64.zip" \
+            -o rojo.zip
+          unzip rojo.zip
+          chmod +x rojo
+          sudo mv rojo /usr/local/bin/rojo
+          rojo --version
+
+      # -----------------------------------------------------------------------
+      # Build the .rbxl place file from the Rojo project manifest
+      # -----------------------------------------------------------------------
+      - name: Build place file
+        run: rojo build default.project.json -o game.rbxl
+
+      # -----------------------------------------------------------------------
+      # Publish to Roblox via Open Cloud API
+      # Required secrets (Settings → Secrets → Actions):
+      #   ROBLOX_API_KEY       — API key with "Universe Place Management: write"
+      #   ROBLOX_UNIVERSE_ID   — Game ID from Studio → File → Game Settings
+      #   ROBLOX_PLACE_ID      — Place ID from the game URL on Roblox.com
+      # -----------------------------------------------------------------------
+      - name: Publish to Roblox
+        run: |
+          HTTP_CODE=$(curl --silent --output response.json --write-out "%{http_code}" \
+            -X POST \
+            "https://apis.roblox.com/universes/v1/${{ secrets.ROBLOX_UNIVERSE_ID }}/places/${{ secrets.ROBLOX_PLACE_ID }}/versions" \
+            -H "x-api-key: ${{ secrets.ROBLOX_API_KEY }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @game.rbxl)
+
+          echo "--- Roblox API response ---"
+          cat response.json
+          echo ""
+
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Publish FAILED with HTTP status $HTTP_CODE"
+            exit 1
+          fi
+
+          VERSION=$(cat response.json | grep -o '"versionNumber":[0-9]*' | grep -o '[0-9]*')
+          echo "Published successfully — place version: $VERSION"
