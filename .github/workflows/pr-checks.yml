@@ -31,8 +31,7 @@ jobs:
           rojo --version
 
       - name: Build place (validation only)
-        # Output to /dev/null so no artifact is stored
-        run: rojo build default.project.json -o /dev/null
+        run: rojo build default.project.json -o /tmp/check.rbxl
 
   # -----------------------------------------------------------------------
   # Job 2 — Selene static analysis (Lua linter)
@@ -54,11 +53,8 @@ jobs:
           sudo mv selene /usr/local/bin/selene
           selene --version
 
-      - name: Download Roblox standard library definitions
-        run: |
-          curl -fsSL \
-            "https://github.com/Kampfkarren/selene/releases/download/0.27.1/roblox.yml" \
-            -o roblox.yml
+      - name: Generate Roblox standard library definitions
+        run: selene generate-roblox-std
 
       - name: Lint Lua sources
         run: selene src/

@@ -2,7 +2,7 @@
 -- Manages per-player leaderboard stats and DataStore persistence.
 -- Saves: Score, Food Stolen, Money, and backpack inventory (food tool names).
 
-local Players         = game:GetService("Players")
+local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
 
 local GameSystems = {}
@@ -12,7 +12,7 @@ local Config = nil
 
 -- DataStore versioned key (bumped to v2 for Money + inventory schema)
 local DATA_STORE_KEY = "PlayerData_v2"
-local playerStore    = nil
+local playerStore = nil
 
 local ok, store = pcall(function()
 	return DataStoreService:GetDataStore(DATA_STORE_KEY)
@@ -33,29 +33,33 @@ local function getStat(player, statName)
 end
 
 local function findFoodType(name)
-	if not Config then return nil end
+	if not Config then
+		return nil
+	end
 	for _, ft in ipairs(Config.FOOD_TYPES) do
-		if ft.name == name then return ft end
+		if ft.name == name then
+			return ft
+		end
 	end
 	return nil
 end
 
 local function makeFoodTool(ft)
 	local tool = Instance.new("Tool")
-	tool.Name           = ft.name
+	tool.Name = ft.name
 	tool.RequiresHandle = true
 
 	local handle = Instance.new("Part")
-	handle.Name      = "Handle"
-	handle.Size      = ft.size * 0.7
+	handle.Name = "Handle"
+	handle.Size = ft.size * 0.7
 	handle.BrickColor = ft.color
-	handle.Material  = Enum.Material.SmoothPlastic
+	handle.Material = Enum.Material.SmoothPlastic
 
 	if ft.texture then
 		local decal = Instance.new("Decal")
 		decal.Texture = ft.texture
-		decal.Face    = Enum.NormalId.Top
-		decal.Parent  = handle
+		decal.Face = Enum.NormalId.Top
+		decal.Parent = handle
 	end
 
 	handle.Parent = tool
@@ -63,26 +67,34 @@ local function makeFoodTool(ft)
 end
 
 local function savePlayer(player)
-	if not playerStore then return end
+	if not playerStore then
+		return
+	end
 	local ls = player:FindFirstChild("leaderstats")
-	if not ls then return end
+	if not ls then
+		return
+	end
 
 	-- Collect backpack inventory tool names
 	local invNames = {}
 	local char = player.Character
 	if char then
 		local eq = char:FindFirstChildOfClass("Tool")
-		if eq then table.insert(invNames, eq.Name) end
+		if eq then
+			table.insert(invNames, eq.Name)
+		end
 	end
 	for _, t in ipairs(player.Backpack:GetChildren()) do
-		if t:IsA("Tool") then table.insert(invNames, t.Name) end
+		if t:IsA("Tool") then
+			table.insert(invNames, t.Name)
+		end
 	end
 
 	local data = {
 		foodStolen = (ls:FindFirstChild("Food Stolen") or {}).Value or 0,
-		score      = (ls:FindFirstChild("Score")       or {}).Value or 0,
-		money      = (ls:FindFirstChild("Money")       or {}).Value or 0,
-		inventory  = invNames,
+		score = (ls:FindFirstChild("Score") or {}).Value or 0,
+		money = (ls:FindFirstChild("Money") or {}).Value or 0,
+		inventory = invNames,
 	}
 
 	local success, err = pcall(function()
@@ -95,25 +107,27 @@ end
 
 local function loadPlayer(player)
 	local ls = Instance.new("Folder")
-	ls.Name   = "leaderstats"
+	ls.Name = "leaderstats"
 	ls.Parent = player
 
 	local foodStolen = Instance.new("IntValue")
-	foodStolen.Name   = "Food Stolen"
-	foodStolen.Value  = 0
+	foodStolen.Name = "Food Stolen"
+	foodStolen.Value = 0
 	foodStolen.Parent = ls
 
 	local score = Instance.new("IntValue")
-	score.Name   = "Score"
-	score.Value  = 0
+	score.Name = "Score"
+	score.Value = 0
 	score.Parent = ls
 
 	local money = Instance.new("IntValue")
-	money.Name   = "Money"
-	money.Value  = 0
+	money.Name = "Money"
+	money.Value = 0
 	money.Parent = ls
 
-	if not playerStore then return end
+	if not playerStore then
+		return
+	end
 
 	local success, data = pcall(function()
 		return playerStore:GetAsync(tostring(player.UserId))
@@ -121,8 +135,8 @@ local function loadPlayer(player)
 
 	if success and type(data) == "table" then
 		foodStolen.Value = data.foodStolen or 0
-		score.Value      = data.score      or 0
-		money.Value      = data.money      or 0
+		score.Value = data.score or 0
+		money.Value = data.money or 0
 
 		-- Restore inventory tools after the character has spawned
 		if type(data.inventory) == "table" and #data.inventory > 0 then
@@ -130,7 +144,7 @@ local function loadPlayer(player)
 				if not player.Character then
 					player.CharacterAdded:Wait()
 				end
-				task.wait(1)  -- let character fully initialise
+				task.wait(1) -- let character fully initialise
 				for _, foodName in ipairs(data.inventory) do
 					local ft = findFoodType(foodName)
 					if ft then
@@ -149,24 +163,34 @@ end
 
 function GameSystems.onFoodStolen(player)
 	local stat = getStat(player, "Food Stolen")
-	if stat then stat.Value = stat.Value + 1 end
+	if stat then
+		stat.Value = stat.Value + 1
+	end
 	local score = getStat(player, "Score")
-	if score then score.Value = score.Value + 10 end
+	if score then
+		score.Value = score.Value + 10
+	end
 end
 
 function GameSystems.onFoodStored(player)
 	local score = getStat(player, "Score")
-	if score then score.Value = score.Value + 25 end
+	if score then
+		score.Value = score.Value + 25
+	end
 end
 
 function GameSystems.onFoodCollected(player, count)
 	local score = getStat(player, "Score")
-	if score then score.Value = score.Value + count * 50 end
+	if score then
+		score.Value = score.Value + count * 50
+	end
 end
 
 function GameSystems.onFoodSold(player, amount)
 	local m = getStat(player, "Money")
-	if m then m.Value = m.Value + amount end
+	if m then
+		m.Value = m.Value + amount
+	end
 end
 
 -- -------------------------------------------------------------------------

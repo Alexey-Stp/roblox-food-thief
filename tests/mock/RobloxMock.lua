@@ -120,7 +120,8 @@ Enum = setmetatable({}, {
 -- ---------------------------------------------------------------------------
 
 -- Builds a fresh mock Instance table for the given className.
-function Instance.new(className)  -- luacheck: ignore 121 (Instance defined below)
+Instance = {}
+function Instance.new(className)
     local inst = {
         ClassName        = className,
         Name             = className,
@@ -336,9 +337,6 @@ function Instance.new(className)  -- luacheck: ignore 121 (Instance defined belo
 
     return inst
 end
-
--- Expose Instance as a global (the factory function above references itself)
-Instance = { new = Instance.new }  -- luacheck: ignore 121
 
 -- ---------------------------------------------------------------------------
 -- game / services

@@ -12,14 +12,13 @@ local function safeRequire(mod, name)
 	return result
 end
 
-local Config            = safeRequire(modules.Config,            "Config")
-local GameSystems       = safeRequire(modules.GameSystems,       "GameSystems")
-local RemoteEvents      = safeRequire(
-	game:GetService("ReplicatedStorage").Shared.RemoteEvents,    "RemoteEvents")
+local Config = safeRequire(modules.Config, "Config")
+local GameSystems = safeRequire(modules.GameSystems, "GameSystems")
+local RemoteEvents = safeRequire(game:GetService("ReplicatedStorage").Shared.RemoteEvents, "RemoteEvents")
 local RestaurantBuilder = safeRequire(modules.RestaurantBuilder, "RestaurantBuilder")
-local FoodSystem        = safeRequire(modules.FoodSystem,        "FoodSystem")
-local EnemyAI           = safeRequire(modules.EnemyAI,           "EnemyAI")
-local BaseBuilder       = safeRequire(modules.BaseBuilder,       "BaseBuilder")
+local FoodSystem = safeRequire(modules.FoodSystem, "FoodSystem")
+local EnemyAI = safeRequire(modules.EnemyAI, "EnemyAI")
+local BaseBuilder = safeRequire(modules.BaseBuilder, "BaseBuilder")
 
 -- 1. Init scoring and DataStore first (players may have already joined)
 GameSystems.init(Config)
@@ -50,14 +49,15 @@ local namePools = {
 }
 for level = 1, Config.FLOOR_COUNT do
 	local floorY = Config.HOTEL_CENTER.Y + (level - 1) * Config.FLOOR_HEIGHT + 2
-	local pool   = namePools[level]
+	local pool = namePools[level]
 	for i = 1, Config.CREATURES_PER_LEVEL do
-		local name     = pool[((i - 1) % #pool) + 1]
-		local angle    = (math.pi * 2 / Config.CREATURES_PER_LEVEL) * i
+		local name = pool[((i - 1) % #pool) + 1]
+		local angle = (math.pi * 2 / Config.CREATURES_PER_LEVEL) * i
 		local spawnPos = Vector3.new(
 			Config.HOTEL_CENTER.X + math.cos(angle) * 60,
 			floorY,
-			Config.HOTEL_CENTER.Z + math.sin(angle) * 60)
+			Config.HOTEL_CENTER.Z + math.sin(angle) * 60
+		)
 		EnemyAI.spawn(name, spawnPos, Config, level)
 	end
 end
