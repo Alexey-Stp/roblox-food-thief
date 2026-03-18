@@ -293,11 +293,7 @@ function GameSystems.getCollectedFood(player)
 	if not settings then
 		return {}
 	end
-	local copy = {}
-	for k, v in pairs(settings.collectedFood) do
-		copy[k] = v
-	end
-	return copy
+	return table.clone(settings.collectedFood)
 end
 
 -- Update cached WalkSpeed / JumpPower so they are saved correctly on next save.

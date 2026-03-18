@@ -5,5 +5,7 @@ return {
         -- Discover files ending in _spec.lua
         pattern = "_spec",
         verbose = true,
+        -- Point busted at the actual spec directory
+        ROOT    = { "tests/spec" },
     },
 }
