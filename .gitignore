@@ -13,3 +13,6 @@ Thumbs.db
 
 # Node tooling (if added later)
 node_modules/
+
+#Others
+.exe

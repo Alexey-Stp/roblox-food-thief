@@ -31,8 +31,7 @@ jobs:
           rojo --version
 
       - name: Build place (validation only)
-        # Output to /dev/null so no artifact is stored
-        run: rojo build default.project.json -o /dev/null
+        run: rojo build default.project.json -o /tmp/check.rbxl
 
   # -----------------------------------------------------------------------
   # Job 2 — Selene static analysis (Lua linter)
@@ -54,11 +53,8 @@ jobs:
           sudo mv selene /usr/local/bin/selene
           selene --version
 
-      - name: Download Roblox standard library definitions
-        run: |
-          curl -fsSL \
-            "https://github.com/Kampfkarren/selene/releases/download/0.27.1/roblox.yml" \
-            -o roblox.yml
+      - name: Generate Roblox standard library definitions
+        run: selene generate-roblox-std
 
       - name: Lint Lua sources
         run: selene src/
@@ -86,3 +82,24 @@ jobs:
       - name: Check formatting
         # Exits non-zero if any file differs from the formatted output
         run: stylua --check src/
+
+  # -----------------------------------------------------------------------
+  # Job 4 — Unit & mock tests (busted / LuaJIT)
+  # -----------------------------------------------------------------------
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install LuaJIT and LuaRocks
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y luajit luarocks
+
+      - name: Install busted
+        run: sudo luarocks install busted
+
+      - name: Run tests
+        run: busted

@@ -1,6 +1,5 @@
-[selene]
-standard_library = "roblox"
+std = "roblox"
 
-[rules]
-# Allow unused variables prefixed with _ (Lua convention)
-unused_variable = { allow_unused_self = true }
+[lints]
+# Unused variables are common in Roblox callbacks; suppress warnings globally
+unused_variable = "allow"

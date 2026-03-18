@@ -6,72 +6,74 @@ local FoodSystem = {}
 
 -- Injected from Main
 local RemoteEvents = nil
-local GameSystems  = nil
+local GameSystems = nil
 
 function FoodSystem.init(remoteEvents, gameSystems)
 	RemoteEvents = remoteEvents
-	GameSystems  = gameSystems
+	GameSystems = gameSystems
 end
 
 local function addDecals(part, foodType)
 	if foodType.texture then
 		local d = Instance.new("Decal")
 		d.Texture = foodType.texture
-		d.Face    = Enum.NormalId.Top
-		d.Parent  = part
+		d.Face = Enum.NormalId.Top
+		d.Parent = part
 	end
 	if foodType.sideTexture then
 		for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
 			local d = Instance.new("Decal")
 			d.Texture = foodType.sideTexture
-			d.Face    = face
-			d.Parent  = part
+			d.Face = face
+			d.Parent = part
 		end
 	end
 end
 
 local function createFood(foodType, position)
 	local food = Instance.new("Part")
-	food.Name       = foodType.name
-	food.Size       = foodType.size
-	food.Position   = position
-	food.Anchored   = true
+	food.Name = foodType.name
+	food.Size = foodType.size
+	food.Position = position
+	food.Anchored = true
 	food.BrickColor = foodType.color
-	food.Material   = Enum.Material.SmoothPlastic
+	food.Material = Enum.Material.SmoothPlastic
 	food.CanCollide = true
-	food.Parent     = workspace
+	food.Parent = workspace
 
 	addDecals(food, foodType)
 
 	-- Green selection highlight
 	local highlight = Instance.new("SelectionBox")
-	highlight.Adornee       = food
-	highlight.Color3        = Color3.new(0, 1, 0)
+	highlight.Adornee = food
+	highlight.Color3 = Color3.new(0, 1, 0)
 	highlight.LineThickness = 0.05
-	highlight.Parent        = food
+	highlight.Parent = food
 
 	-- E key proximity prompt for stealing
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText            = "Take Food"
-	prompt.ObjectText            = foodType.name
-	prompt.KeyboardKeyCode       = Enum.KeyCode.E
-	prompt.RequiresLineOfSight   = false
+	prompt.ActionText = "Take Food"
+	prompt.ObjectText = foodType.name
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.RequiresLineOfSight = false
 	prompt.MaxActivationDistance = 8
-	prompt.Parent                = food
+	prompt.Parent = food
 
 	prompt.Triggered:Connect(function(player)
-		if not (food and food.Parent) then return end
+		if not (food and food.Parent) then
+			return
+		end
 
 		-- Build a Tool for the player's backpack
 		local tool = Instance.new("Tool")
-		tool.Name           = foodType.name
+		tool.Name = foodType.name
 		tool.RequiresHandle = true
 
 		local handle = Instance.new("Part")
-		handle.Name      = "Handle"
-		handle.Size      = foodType.size * 0.7
+		handle.Name = "Handle"
+		handle.Size = foodType.size * 0.7
 		handle.BrickColor = foodType.color
-		handle.Material  = Enum.Material.SmoothPlastic
+		handle.Material = Enum.Material.SmoothPlastic
 		addDecals(handle, foodType)
 		handle.Parent = tool
 

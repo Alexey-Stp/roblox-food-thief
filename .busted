@@ -1,0 +1,11 @@
+return {
+    default = {
+        -- Load the Roblox mock globals before any spec file runs
+        helper  = "tests/mock/RobloxMock",
+        -- Discover files ending in _spec.lua
+        pattern = "_spec",
+        verbose = true,
+        -- Point busted at the actual spec directory
+        ROOT    = { "tests/spec" },
+    },
+}

@@ -1,0 +1,2 @@
+# Test files run under LuaJIT via busted — use Lua 5.1 std + busted globals
+std = "lua51+busted"

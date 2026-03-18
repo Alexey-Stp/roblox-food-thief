@@ -3,7 +3,7 @@
 -- Saves: Score, Food Stolen, Money, backpack inventory (food tool names),
 --        WalkSpeed, JumpPower, and the persistent collectedFood set.
 
-local Players          = game:GetService("Players")
+local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
 
 local GameSystems = {}
@@ -13,7 +13,7 @@ local Config = nil
 
 -- DataStore versioned key (bumped to v3 for WalkSpeed, JumpPower, collectedFood)
 local DATA_STORE_KEY = "PlayerData_v3"
-local playerStore    = nil
+local playerStore = nil
 
 local ok, store = pcall(function()
 	return DataStoreService:GetDataStore(DATA_STORE_KEY)
@@ -45,29 +45,33 @@ local function getStat(player, statName)
 end
 
 local function findFoodType(name)
-	if not Config then return nil end
+	if not Config then
+		return nil
+	end
 	for _, ft in ipairs(Config.FOOD_TYPES) do
-		if ft.name == name then return ft end
+		if ft.name == name then
+			return ft
+		end
 	end
 	return nil
 end
 
 local function makeFoodTool(ft)
 	local tool = Instance.new("Tool")
-	tool.Name           = ft.name
+	tool.Name = ft.name
 	tool.RequiresHandle = true
 
 	local handle = Instance.new("Part")
-	handle.Name      = "Handle"
-	handle.Size      = ft.size * 0.7
+	handle.Name = "Handle"
+	handle.Size = ft.size * 0.7
 	handle.BrickColor = ft.color
-	handle.Material  = Enum.Material.SmoothPlastic
+	handle.Material = Enum.Material.SmoothPlastic
 
 	if ft.texture then
 		local decal = Instance.new("Decal")
 		decal.Texture = ft.texture
-		decal.Face    = Enum.NormalId.Top
-		decal.Parent  = handle
+		decal.Face = Enum.NormalId.Top
+		decal.Parent = handle
 	end
 
 	handle.Parent = tool
@@ -75,25 +79,33 @@ local function makeFoodTool(ft)
 end
 
 local function savePlayer(player)
-	if not playerStore then return end
+	if not playerStore then
+		return
+	end
 	local ls = player:FindFirstChild("leaderstats")
-	if not ls then return end
+	if not ls then
+		return
+	end
 
 	-- Collect backpack inventory tool names
 	local invNames = {}
 	local char = player.Character
 	if char then
 		local eq = char:FindFirstChildOfClass("Tool")
-		if eq then table.insert(invNames, eq.Name) end
+		if eq then
+			table.insert(invNames, eq.Name)
+		end
 	end
 	for _, t in ipairs(player.Backpack:GetChildren()) do
-		if t:IsA("Tool") then table.insert(invNames, t.Name) end
+		if t:IsA("Tool") then
+			table.insert(invNames, t.Name)
+		end
 	end
 
 	-- Read current WalkSpeed / JumpPower from the live humanoid (or fall back to
 	-- the cached settings if the character has already been destroyed).
-	local settings  = playerSettings[player.UserId] or {}
-	local humanoid  = char and char:FindFirstChildOfClass("Humanoid")
+	local settings = playerSettings[player.UserId] or {}
+	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 	local walkSpeed = (humanoid and humanoid.WalkSpeed) or settings.walkSpeed or 16
 	local jumpPower = (humanoid and humanoid.JumpPower) or settings.jumpPower or 50
 
@@ -104,12 +116,12 @@ local function savePlayer(player)
 	end
 
 	local data = {
-		foodStolen    = (ls:FindFirstChild("Food Stolen") or {}).Value or 0,
-		score         = (ls:FindFirstChild("Score")       or {}).Value or 0,
-		money         = (ls:FindFirstChild("Money")       or {}).Value or 0,
-		inventory     = invNames,
-		walkSpeed     = walkSpeed,
-		jumpPower     = jumpPower,
+		foodStolen = (ls:FindFirstChild("Food Stolen") or {}).Value or 0,
+		score = (ls:FindFirstChild("Score") or {}).Value or 0,
+		money = (ls:FindFirstChild("Money") or {}).Value or 0,
+		inventory = invNames,
+		walkSpeed = walkSpeed,
+		jumpPower = jumpPower,
 		collectedFood = collectedList,
 	}
 
@@ -125,12 +137,18 @@ end
 -- Called on CharacterAdded so settings survive respawn.
 local function applySettings(player)
 	local settings = playerSettings[player.UserId]
-	if not settings then return end
+	if not settings then
+		return
+	end
 
 	local char = player.Character
-	if not char then return end
+	if not char then
+		return
+	end
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return end
+	if not humanoid then
+		return
+	end
 
 	humanoid.WalkSpeed = settings.walkSpeed
 	humanoid.JumpPower = settings.jumpPower
@@ -138,28 +156,28 @@ end
 
 local function loadPlayer(player)
 	local ls = Instance.new("Folder")
-	ls.Name   = "leaderstats"
+	ls.Name = "leaderstats"
 	ls.Parent = player
 
 	local foodStolen = Instance.new("IntValue")
-	foodStolen.Name   = "Food Stolen"
-	foodStolen.Value  = 0
+	foodStolen.Name = "Food Stolen"
+	foodStolen.Value = 0
 	foodStolen.Parent = ls
 
 	local score = Instance.new("IntValue")
-	score.Name   = "Score"
-	score.Value  = 0
+	score.Name = "Score"
+	score.Value = 0
 	score.Parent = ls
 
 	local money = Instance.new("IntValue")
-	money.Name   = "Money"
-	money.Value  = 0
+	money.Name = "Money"
+	money.Value = 0
 	money.Parent = ls
 
 	-- Initialise runtime settings with safe defaults (WalkSpeed=16, JumpPower=50)
 	playerSettings[player.UserId] = {
-		walkSpeed     = 16,
-		jumpPower     = 50,
+		walkSpeed = 16,
+		jumpPower = 50,
 		collectedFood = {},
 	}
 
@@ -170,8 +188,8 @@ local function loadPlayer(player)
 
 		if success and type(data) == "table" then
 			foodStolen.Value = data.foodStolen or 0
-			score.Value      = data.score      or 0
-			money.Value      = data.money      or 0
+			score.Value = data.score or 0
+			money.Value = data.money or 0
 
 			-- Restore WalkSpeed / JumpPower (default to Roblox defaults if absent)
 			playerSettings[player.UserId].walkSpeed = data.walkSpeed or 16
@@ -190,7 +208,7 @@ local function loadPlayer(player)
 					if not player.Character then
 						player.CharacterAdded:Wait()
 					end
-					task.wait(1)  -- let character fully initialise
+					task.wait(1) -- let character fully initialise
 					for _, foodName in ipairs(data.inventory) do
 						local ft = findFoodType(foodName)
 						if ft then
@@ -224,24 +242,34 @@ end
 
 function GameSystems.onFoodStolen(player)
 	local stat = getStat(player, "Food Stolen")
-	if stat then stat.Value = stat.Value + 1 end
+	if stat then
+		stat.Value = stat.Value + 1
+	end
 	local score = getStat(player, "Score")
-	if score then score.Value = score.Value + 10 end
+	if score then
+		score.Value = score.Value + 10
+	end
 end
 
 function GameSystems.onFoodStored(player)
 	local score = getStat(player, "Score")
-	if score then score.Value = score.Value + 25 end
+	if score then
+		score.Value = score.Value + 25
+	end
 end
 
 function GameSystems.onFoodCollected(player, count)
 	local score = getStat(player, "Score")
-	if score then score.Value = score.Value + count * 50 end
+	if score then
+		score.Value = score.Value + count * 50
+	end
 end
 
 function GameSystems.onFoodSold(player, amount)
 	local m = getStat(player, "Money")
-	if m then m.Value = m.Value + amount end
+	if m then
+		m.Value = m.Value + amount
+	end
 end
 
 -- Record that a player has collected a specific food item.
@@ -249,32 +277,38 @@ end
 -- false if it was already in the player's collected set (duplicate).
 function GameSystems.recordFoodCollected(player, foodName)
 	local settings = playerSettings[player.UserId]
-	if not settings then return false end
+	if not settings then
+		return false
+	end
 	if settings.collectedFood[foodName] then
-		return false  -- already collected — duplicate
+		return false -- already collected — duplicate
 	end
 	settings.collectedFood[foodName] = true
-	return true  -- newly collected
+	return true -- newly collected
 end
 
 -- Returns a copy of the player's collected food set (table of foodName → true).
 function GameSystems.getCollectedFood(player)
 	local settings = playerSettings[player.UserId]
-	if not settings then return {} end
-	local copy = {}
-	for k, v in pairs(settings.collectedFood) do
-		copy[k] = v
+	if not settings then
+		return {}
 	end
-	return copy
+	return table.clone(settings.collectedFood)
 end
 
 -- Update cached WalkSpeed / JumpPower so they are saved correctly on next save.
 -- Called by BaseBuilder's shop whenever a player buys a boost.
 function GameSystems.updateSettings(player, walkSpeed, jumpPower)
 	local settings = playerSettings[player.UserId]
-	if not settings then return end
-	if walkSpeed then settings.walkSpeed = walkSpeed end
-	if jumpPower then settings.jumpPower = jumpPower end
+	if not settings then
+		return
+	end
+	if walkSpeed then
+		settings.walkSpeed = walkSpeed
+	end
+	if jumpPower then
+		settings.jumpPower = jumpPower
+	end
 end
 
 -- -------------------------------------------------------------------------
