@@ -1,3 +1,2 @@
-[selene]
 # Test files run under LuaJIT via busted — use Lua 5.1 std + busted globals
-standard_library = "lua51+busted"
+std = "lua51+busted"
