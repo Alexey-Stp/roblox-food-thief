@@ -667,9 +667,7 @@ local function buildSlabWithOpenings(parent, floorIndex, Config, openings)
 
 			local w = cellXMax - cellXMin
 			local d = cellZMax - cellZMin
-			if w < 0.01 or d < 0.01 then
-				-- skip degenerate cells
-			else
+			if w >= 0.01 and d >= 0.01 then
 				local blocked = false
 				for _, o in ipairs(openings) do
 					if cellXMin >= o.xMin and cellXMax <= o.xMax and cellZMin >= o.zMin and cellZMax <= o.zMax then
@@ -753,11 +751,7 @@ local function buildTablesForFloor(parent, floorIndex, Config)
 			local back = Instance.new("Part")
 			back.Name = "ChairBack_F" .. floorIndex .. "_" .. i .. "_" .. ci
 			back.Size = Vector3.new(2.5, 2.5, 0.3)
-			back.Position = Vector3.new(
-				tx + offset.X + backOffsetX,
-				floorY + 3.45,
-				tz + offset.Z + backOffsetZ
-			)
+			back.Position = Vector3.new(tx + offset.X + backOffsetX, floorY + 3.45, tz + offset.Z + backOffsetZ)
 			back.Anchored = true
 			back.BrickColor = chairColor
 			back.Material = Enum.Material.SmoothPlastic
