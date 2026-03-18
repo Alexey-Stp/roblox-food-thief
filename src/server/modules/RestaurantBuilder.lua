@@ -144,10 +144,18 @@ end
 --   dirX       : +1 → steps advance eastward, -1 → westward
 --   stepWidth  : Z extent of each step (the "width" perpendicular to travel)
 -- -------------------------------------------------------------------------
+-- STEP_COUNT × STEP_HEIGHT must not exceed Config.FLOOR_HEIGHT (25).
+-- 12 × 2 = 24 studs — fits cleanly with 1 stud clearance below the ceiling slab.
+local STAIR_STEP_COUNT = 12
+local STAIR_STEP_HEIGHT = 2
+local STAIR_STEP_DEPTH = 2
+-- Horizontal distance the staircase travels (used externally to compute slab openings)
+local STAIR_TRAVEL = STAIR_STEP_COUNT * STAIR_STEP_DEPTH -- 24 studs
+
 local function buildStaircase(parent, name, startX, startY, startZ, dirX, stepWidth)
-	local STEP_COUNT = 13
-	local STEP_HEIGHT = 2 -- studs per step vertically
-	local STEP_DEPTH = 2 -- studs per step horizontally
+	local STEP_COUNT = STAIR_STEP_COUNT
+	local STEP_HEIGHT = STAIR_STEP_HEIGHT -- studs per step vertically
+	local STEP_DEPTH = STAIR_STEP_DEPTH -- studs per step horizontally
 	local STEP_MAT = Enum.Material.Metal
 	local STEP_COLOR = BrickColor.new("Medium stone grey")
 	local GLOW_COLOR = Color3.fromRGB(80, 190, 255)
@@ -212,6 +220,23 @@ local function buildStaircase(parent, name, startX, startY, startZ, dirX, stepWi
 
 	makeRail(-(stepWidth / 2 + 0.5))
 	makeRail((stepWidth / 2 + 0.5))
+
+	-- Landing platform at the top — bridges the gap between the last step
+	-- and the upper-floor surface so the player can step off smoothly.
+	local topStepTopY = startY + STEP_COUNT * STEP_HEIGHT -- top face of the final step
+	local landingDepth = STEP_DEPTH * 2
+	local landing = Instance.new("Part")
+	landing.Name = name .. "_Landing"
+	landing.Size = Vector3.new(landingDepth, STEP_HEIGHT, stepWidth)
+	landing.Position = Vector3.new(
+		startX + dirX * (STEP_COUNT * STEP_DEPTH + landingDepth / 2),
+		topStepTopY - STEP_HEIGHT / 2, -- flush with top step surface
+		startZ
+	)
+	landing.Anchored = true
+	landing.BrickColor = BrickColor.new("Medium stone grey")
+	landing.Material = Enum.Material.Metal
+	landing.Parent = parent
 end
 
 -- -------------------------------------------------------------------------
@@ -507,7 +532,8 @@ local function buildLift(parent, Config, side)
 	local isAtBottom = true
 	local isMoving = false
 
-	prompt.Triggered:Connect(function()
+	-- Shared move logic: move the platform to the given target Y position
+	local function moveLift(targetIsBottom)
 		if isMoving then
 			return
 		end
@@ -518,7 +544,7 @@ local function buildLift(parent, Config, side)
 		liftCooldowns[platform] = now
 		isMoving = true
 
-		local targetY = isAtBottom and (yHigh + 0.5) or (yLow + 0.5)
+		local targetY = targetIsBottom and (yLow + 0.5) or (yHigh + 0.5)
 		local tween = TweenService:Create(
 			platform,
 			TweenInfo.new(2, Enum.EasingStyle.Linear),
@@ -526,7 +552,7 @@ local function buildLift(parent, Config, side)
 		)
 		tween:Play()
 		tween.Completed:Connect(function()
-			isAtBottom = not isAtBottom
+			isAtBottom = targetIsBottom
 			isMoving = false
 			if side == "east" then
 				prompt.ActionText = isAtBottom and "Ride to Floor 2 ↑" or "Ride to Floor 1 ↓"
@@ -534,52 +560,137 @@ local function buildLift(parent, Config, side)
 				prompt.ActionText = isAtBottom and "Ride to Floor 3 ↑" or "Ride to Floor 2 ↓"
 			end
 		end)
+	end
+
+	prompt.Triggered:Connect(function()
+		moveLift(not isAtBottom)
 	end)
+
+	-- -----------------------------------------------------------------------
+	-- Call buttons — one per served floor, placed on the shaft's south face
+	-- so players can summon the lift without boarding it first.
+	-- -----------------------------------------------------------------------
+	local floorYs = { yLow, yHigh }
+	local floorLabels
+	if side == "east" then
+		floorLabels = { "CALL ↑ F2", "CALL ↓ F1" }
+	else
+		floorLabels = { "CALL ↑ F3", "CALL ↓ F2" }
+	end
+
+	for fi, floorY in ipairs(floorYs) do
+		local btnX = liftX
+		local btnZ = liftZ - shaftSize / 2 - 2 -- just outside the south shaft wall
+		local btnY = floorY + 1.5
+
+		local btn = Instance.new("Part")
+		btn.Name = "LiftCallBtn_" .. side .. "_" .. fi
+		btn.Size = Vector3.new(3, 3, 0.5)
+		btn.Position = Vector3.new(btnX, btnY, btnZ)
+		btn.Anchored = true
+		btn.BrickColor = BrickColor.new("Bright yellow")
+		btn.Material = Enum.Material.Neon
+		btn.CanCollide = false
+		btn.Parent = parent
+		addLabel(btn, Enum.NormalId.Front, floorLabels[fi], Color3.new(0, 0, 0))
+
+		local callPrompt = Instance.new("ProximityPrompt")
+		callPrompt.ActionText = "Call Lift"
+		callPrompt.ObjectText = "Elevator"
+		callPrompt.MaxActivationDistance = 12
+		callPrompt.Parent = btn
+
+		-- Capture fi at closure creation time
+		local wantBottom = (fi == 1)
+		callPrompt.Triggered:Connect(function()
+			if isMoving then
+				return -- lift is in transit; ignore until it arrives
+			end
+			if isAtBottom == wantBottom then
+				return -- lift is already at this floor
+			end
+			moveLift(wantBottom)
+		end)
+	end
 end
 
 -- -------------------------------------------------------------------------
--- Floor slab with lift shaft hole (3-Part arrangement around 18×18 opening)
+-- Floor slab with arbitrary rectangular openings.
+-- openings: array of { xMin, xMax, zMin, zMax } world-space exclusion zones.
+-- The function tiles the interior floor area with concrete Parts, skipping
+-- any cell that falls entirely within an opening rectangle.
 -- -------------------------------------------------------------------------
-local function buildFloorSlab(parent, floorIndex, Config, liftSide)
+local function buildSlabWithOpenings(parent, floorIndex, Config, openings)
 	local cx = Config.HOTEL_CENTER.X
 	local cz = Config.HOTEL_CENTER.Z
 	local slabY = Config.HOTEL_CENTER.Y + floorIndex * Config.FLOOR_HEIGHT
 	local interior = Config.HOTEL_SIZE.X - 2 * Config.WALL_THICKNESS -- 340
-	local hw = Config.HOTEL_SIZE.X / 2
-	local shaftW = 18
 
-	local liftX = (liftSide == "east") and (cx + hw - 25) or (cx - hw + 25)
-	local shaftCX = liftX -- world X center of shaft
-	local shaftCZ = cz
+	local xBound0 = cx - interior / 2
+	local xBound1 = cx + interior / 2
+	local zBound0 = cz - interior / 2
+	local zBound1 = cz + interior / 2
 
-	-- Slab as 3 rows: left strip (full Z), right strip (full Z), middle column minus shaft hole
-	local leftEdge = cx - interior / 2
-	local rightEdge = cx + interior / 2
-	local leftW = shaftCX - shaftW / 2 - leftEdge
-	local rightW = rightEdge - (shaftCX + shaftW / 2)
-	local midW = shaftW
-
-	local function makeSlab(name, size, wx, wz)
-		local s = Instance.new("Part")
-		s.Name = name
-		s.Size = size
-		s.Position = Vector3.new(wx, slabY, wz)
-		s.Anchored = true
-		s.BrickColor = BrickColor.new("Dark stone grey")
-		s.Material = Enum.Material.Concrete
-		s.Parent = parent
+	-- Collect unique X and Z split points from interior bounds + all opening edges
+	local xSplits = { xBound0, xBound1 }
+	local zSplits = { zBound0, zBound1 }
+	for _, o in ipairs(openings) do
+		table.insert(xSplits, math.max(xBound0, math.min(xBound1, o.xMin)))
+		table.insert(xSplits, math.max(xBound0, math.min(xBound1, o.xMax)))
+		table.insert(zSplits, math.max(zBound0, math.min(zBound1, o.zMin)))
+		table.insert(zSplits, math.max(zBound0, math.min(zBound1, o.zMax)))
 	end
 
-	-- Left column (all Z)
-	makeSlab("Slab" .. floorIndex .. "_Left", Vector3.new(leftW, 1, interior), leftEdge + leftW / 2, cz)
+	table.sort(xSplits)
+	table.sort(zSplits)
 
-	-- Right column (all Z)
-	makeSlab("Slab" .. floorIndex .. "_Right", Vector3.new(rightW, 1, interior), rightEdge - rightW / 2, cz)
+	-- Remove duplicate values within floating-point tolerance
+	local function dedup(t)
+		local result = { t[1] }
+		for i = 2, #t do
+			if t[i] - result[#result] > 0.01 then
+				table.insert(result, t[i])
+			end
+		end
+		return result
+	end
+	xSplits = dedup(xSplits)
+	zSplits = dedup(zSplits)
 
-	-- Middle column: two halves in Z (gap = shaftW wide in Z, centred on shaftCZ)
-	local halfZ = (interior - shaftW) / 2
-	makeSlab("Slab" .. floorIndex .. "_MidS", Vector3.new(midW, 1, halfZ), shaftCX, shaftCZ - shaftW / 2 - halfZ / 2)
-	makeSlab("Slab" .. floorIndex .. "_MidN", Vector3.new(midW, 1, halfZ), shaftCX, shaftCZ + shaftW / 2 + halfZ / 2)
+	-- Build one concrete Part per non-blocked cell
+	for ix = 1, #xSplits - 1 do
+		for iz = 1, #zSplits - 1 do
+			local cellXMin = xSplits[ix]
+			local cellXMax = xSplits[ix + 1]
+			local cellZMin = zSplits[iz]
+			local cellZMax = zSplits[iz + 1]
+
+			local w = cellXMax - cellXMin
+			local d = cellZMax - cellZMin
+			if w < 0.01 or d < 0.01 then
+				-- skip degenerate cells
+			else
+				local blocked = false
+				for _, o in ipairs(openings) do
+					if cellXMin >= o.xMin and cellXMax <= o.xMax and cellZMin >= o.zMin and cellZMax <= o.zMax then
+						blocked = true
+						break
+					end
+				end
+
+				if not blocked then
+					local s = Instance.new("Part")
+					s.Name = "Slab" .. floorIndex
+					s.Size = Vector3.new(w, 1, d)
+					s.Position = Vector3.new((cellXMin + cellXMax) / 2, slabY, (cellZMin + cellZMax) / 2)
+					s.Anchored = true
+					s.BrickColor = BrickColor.new("Dark stone grey")
+					s.Material = Enum.Material.Concrete
+					s.Parent = parent
+				end
+			end
+		end
+	end
 end
 
 -- -------------------------------------------------------------------------
@@ -593,6 +704,14 @@ local function buildTablesForFloor(parent, floorIndex, Config)
 	local radius = 80
 
 	local foodPositions = {}
+
+	-- Chair colours per floor
+	local chairColors = {
+		BrickColor.new("Bright red"), -- F1
+		BrickColor.new("Sand blue"), -- F2
+		BrickColor.new("Dark grey"), -- F3
+	}
+	local chairColor = chairColors[floorIndex]
 
 	for i = 1, tableCount do
 		local angle = (math.pi * 2 / tableCount) * i
@@ -609,6 +728,42 @@ local function buildTablesForFloor(parent, floorIndex, Config)
 		tbl.Material = Enum.Material.Wood
 		tbl.Parent = parent
 
+		-- Four chairs around the table (N/S/E/W at 5-stud offset from centre)
+		local chairOffsets = {
+			Vector3.new(0, 0, 5),
+			Vector3.new(0, 0, -5),
+			Vector3.new(5, 0, 0),
+			Vector3.new(-5, 0, 0),
+		}
+		for ci, offset in ipairs(chairOffsets) do
+			-- Seat
+			local seat = Instance.new("Part")
+			seat.Name = "Chair_F" .. floorIndex .. "_" .. i .. "_" .. ci
+			seat.Size = Vector3.new(2.5, 0.4, 2.5)
+			seat.Position = Vector3.new(tx + offset.X, floorY + 2.2, tz + offset.Z)
+			seat.Anchored = true
+			seat.BrickColor = chairColor
+			seat.Material = Enum.Material.SmoothPlastic
+			seat.Parent = parent
+			-- Back — pushed 1.1 studs further from the table centre
+			-- The offset vector points away from the table; we push the back
+			-- in the same direction so it sits behind the seat.
+			local backOffsetX = offset.X ~= 0 and (offset.X / math.abs(offset.X) * 1.1) or 0
+			local backOffsetZ = offset.Z ~= 0 and (offset.Z / math.abs(offset.Z) * 1.1) or 0
+			local back = Instance.new("Part")
+			back.Name = "ChairBack_F" .. floorIndex .. "_" .. i .. "_" .. ci
+			back.Size = Vector3.new(2.5, 2.5, 0.3)
+			back.Position = Vector3.new(
+				tx + offset.X + backOffsetX,
+				floorY + 3.45,
+				tz + offset.Z + backOffsetZ
+			)
+			back.Anchored = true
+			back.BrickColor = chairColor
+			back.Material = Enum.Material.SmoothPlastic
+			back.Parent = parent
+		end
+
 		local foodType = Config.FOOD_TYPES[((i - 1) % #Config.FOOD_TYPES) + 1]
 		local foodPos = Vector3.new(tx, tableTopY + foodType.size.Y / 2 + 0.1, tz)
 		table.insert(foodPositions, { position = foodPos, foodType = foodType })
@@ -618,8 +773,158 @@ local function buildTablesForFloor(parent, floorIndex, Config)
 end
 
 -- -------------------------------------------------------------------------
--- Ground floor lobby
+-- Bar counter — a long L-shaped counter for the restaurant feel.
+-- Placed on each floor near the east interior wall.
 -- -------------------------------------------------------------------------
+local function buildBarCounter(parent, floorIndex, Config)
+	local cx = Config.HOTEL_CENTER.X
+	local cz = Config.HOTEL_CENTER.Z
+	local floorY = Config.HOTEL_CENTER.Y + (floorIndex - 1) * Config.FLOOR_HEIGHT
+	local hw = Config.HOTEL_SIZE.X / 2 - Config.WALL_THICKNESS -- inner edge
+
+	-- Main bar (runs north–south)
+	local barX = cx + hw - 20
+	local barZ = cz
+	local barMain = Instance.new("Part")
+	barMain.Name = "BarCounter_F" .. floorIndex
+	barMain.Size = Vector3.new(4, 4, 60)
+	barMain.Position = Vector3.new(barX, floorY + 2.5, barZ)
+	barMain.Anchored = true
+	barMain.BrickColor = BrickColor.new("Dark orange")
+	barMain.Material = Enum.Material.Wood
+	barMain.Parent = parent
+	addLabel(barMain, Enum.NormalId.Left, "BAR", Color3.new(1, 1, 1))
+
+	-- Bar top surface (slightly lighter)
+	local top = Instance.new("Part")
+	top.Name = "BarTop_F" .. floorIndex
+	top.Size = Vector3.new(4.2, 0.4, 60.2)
+	top.Position = Vector3.new(barX, floorY + 4.7, barZ)
+	top.Anchored = true
+	top.BrickColor = BrickColor.new("Reddish brown")
+	top.Material = Enum.Material.Wood
+	top.Parent = parent
+end
+
+-- -------------------------------------------------------------------------
+-- Wall paintings — adds decorative picture frames on the interior walls.
+-- -------------------------------------------------------------------------
+local function buildWallPaintings(parent, floorIndex, Config)
+	local cx = Config.HOTEL_CENTER.X
+	local cz = Config.HOTEL_CENTER.Z
+	local floorY = Config.HOTEL_CENTER.Y + (floorIndex - 1) * Config.FLOOR_HEIGHT
+	local rz = Config.HOTEL_SIZE.Z
+	local paintingY = floorY + Config.FLOOR_HEIGHT * 0.6
+
+	-- Painting colours by floor theme
+	local paintColors = {
+		{ BrickColor.new("Bright blue"), BrickColor.new("Bright green"), BrickColor.new("Bright yellow") },
+		{ BrickColor.new("Sand red"), BrickColor.new("Medium orange"), BrickColor.new("Pastel blue") },
+		{ BrickColor.new("Dark purple"), BrickColor.new("Sand blue"), BrickColor.new("Dark red") },
+	}
+	local colors = paintColors[floorIndex]
+
+	local paintings = {
+		{ x = cx - 80, z = cz + rz / 2 - 3, rotY = 0 },
+		{ x = cx, z = cz + rz / 2 - 3, rotY = 0 },
+		{ x = cx + 80, z = cz + rz / 2 - 3, rotY = 0 },
+	}
+
+	for pi, p in ipairs(paintings) do
+		-- Frame
+		local frame = Instance.new("Part")
+		frame.Name = "Painting_F" .. floorIndex .. "_" .. pi
+		frame.Size = Vector3.new(12, 8, 0.4)
+		frame.Position = Vector3.new(p.x, paintingY, p.z)
+		frame.Anchored = true
+		frame.BrickColor = BrickColor.new("Dark grey")
+		frame.Material = Enum.Material.Wood
+		frame.Parent = parent
+		-- Canvas
+		local canvas = Instance.new("Part")
+		canvas.Name = "Canvas_F" .. floorIndex .. "_" .. pi
+		canvas.Size = Vector3.new(10, 6, 0.3)
+		canvas.Position = Vector3.new(p.x, paintingY, p.z - 0.1)
+		canvas.Anchored = true
+		canvas.BrickColor = colors[pi] or colors[1]
+		canvas.Material = Enum.Material.SmoothPlastic
+		canvas.Parent = parent
+	end
+end
+
+-- -------------------------------------------------------------------------
+-- Entrance path — a stone walkway leading south from the main door.
+-- -------------------------------------------------------------------------
+local function buildEntrancePath(parent, Config)
+	local cx = Config.HOTEL_CENTER.X
+	local cz = Config.HOTEL_CENTER.Z
+	local rz = Config.HOTEL_SIZE.Z
+
+	local startZ = cz - rz / 2 - 5
+	local endZ = startZ - 80
+	local segCount = 8
+	local segLen = (startZ - endZ) / segCount
+
+	for i = 0, segCount - 1 do
+		local seg = Instance.new("Part")
+		seg.Name = "EntrancePath_" .. i
+		seg.Size = Vector3.new(18, 0.5, segLen - 0.5)
+		seg.Position = Vector3.new(cx, 0.25, startZ - i * segLen - segLen / 2)
+		seg.Anchored = true
+		seg.BrickColor = BrickColor.new("Light stone grey")
+		seg.Material = Enum.Material.Cobblestone
+		seg.Parent = parent
+	end
+end
+
+-- -------------------------------------------------------------------------
+-- Decorative river — a wide blue Part running east–west to the south.
+-- -------------------------------------------------------------------------
+local function buildRiver(parent, Config)
+	local cx = Config.HOTEL_CENTER.X
+	local cz = Config.HOTEL_CENTER.Z
+	local rz = Config.HOTEL_SIZE.Z
+
+	local river = Instance.new("Part")
+	river.Name = "River"
+	river.Size = Vector3.new(1000, 0.4, 30)
+	river.Position = Vector3.new(cx, 0.2, cz - rz / 2 - 150)
+	river.Anchored = true
+	river.BrickColor = BrickColor.new("Bright blue")
+	river.Material = Enum.Material.Foil
+	river.Transparency = 0.35
+	river.CanCollide = false
+	river.Parent = parent
+end
+
+-- -------------------------------------------------------------------------
+-- Gentle hill ramps — pairs of wedge-shaped Parts on both sides of the
+-- entrance path to give the terrain a sculpted feel.
+-- -------------------------------------------------------------------------
+local function buildHills(parent, Config)
+	local cx = Config.HOTEL_CENTER.X
+	local cz = Config.HOTEL_CENTER.Z
+	local rz = Config.HOTEL_SIZE.Z
+	local baseZ = cz - rz / 2 - 40
+
+	local hillData = {
+		{ dx = -140, dz = 0, sx = 60, sz = 80, h = 18 },
+		{ dx = 140, dz = 0, sx = 60, sz = 80, h = 18 },
+		{ dx = -200, dz = -50, sx = 80, sz = 60, h = 12 },
+		{ dx = 200, dz = -50, sx = 80, sz = 60, h = 12 },
+	}
+
+	for _, hd in ipairs(hillData) do
+		local hill = Instance.new("Part")
+		hill.Name = "Hill"
+		hill.Size = Vector3.new(hd.sx, hd.h, hd.sz)
+		hill.Position = Vector3.new(cx + hd.dx, hd.h / 2, baseZ + hd.dz)
+		hill.Anchored = true
+		hill.BrickColor = BrickColor.new("Earth green")
+		hill.Material = Enum.Material.Grass
+		hill.Parent = parent
+	end
+end
 local function buildLobby(parent, cx, cy, cz)
 	local carpet = Instance.new("Part")
 	carpet.Name = "Carpet"
@@ -816,18 +1121,47 @@ function RestaurantBuilder.build(Config)
 	-- Lobby
 	buildLobby(hotel, cx, cy + 0.5, cz)
 
-	-- Interior floor slabs with lift shaft holes
-	buildFloorSlab(hotel, 1, Config, "east") -- F1→F2 slab (east lift)
-	buildFloorSlab(hotel, 2, Config, "west") -- F2→F3 slab (west lift)
+	-- -----------------------------------------------------------------------
+	-- Interior floor slabs with openings for the lift shaft AND the staircase.
+	-- The staircase constants must match the buildStaircase calls below.
+	-- -----------------------------------------------------------------------
+	local liftShaftHW = 9 -- half-width of shaft opening (shaftSize/2 + 1 = 9)
+	local hw = rx / 2
+	local liftEX = cx + hw - 25 -- east lift world X
+	local liftWX = cx - hw + 25 -- west lift world X
+	local stairStepWidth = 12
+	local stairMargin = 2 -- slab cutout margin beyond the step footprint
+
+	-- F1→F2 staircase: starts at (cx-50, cz+130) heading east, travels STAIR_TRAVEL studs
+	local s12xMin = cx - 50 - stairMargin
+	local s12xMax = cx - 50 + STAIR_TRAVEL + stairMargin
+	local s12zMin = cz + 130 - stairStepWidth / 2 - stairMargin
+	local s12zMax = cz + 130 + stairStepWidth / 2 + stairMargin
+
+	-- F2→F3 staircase: starts at (cx+50, cz-130) heading west, travels STAIR_TRAVEL studs
+	local s23xMin = cx + 50 - STAIR_TRAVEL - stairMargin
+	local s23xMax = cx + 50 + stairMargin
+	local s23zMin = cz - 130 - stairStepWidth / 2 - stairMargin
+	local s23zMax = cz - 130 + stairStepWidth / 2 + stairMargin
+
+	buildSlabWithOpenings(hotel, 1, Config, {
+		-- Lift shaft (east, F1↔F2)
+		{ xMin = liftEX - liftShaftHW, xMax = liftEX + liftShaftHW, zMin = cz - liftShaftHW, zMax = cz + liftShaftHW },
+		-- Staircase opening (F1→F2)
+		{ xMin = s12xMin, xMax = s12xMax, zMin = s12zMin, zMax = s12zMax },
+	})
+	buildSlabWithOpenings(hotel, 2, Config, {
+		-- Lift shaft (west, F2↔F3)
+		{ xMin = liftWX - liftShaftHW, xMax = liftWX + liftShaftHW, zMin = cz - liftShaftHW, zMax = cz + liftShaftHW },
+		-- Staircase opening (F2→F3)
+		{ xMin = s23xMin, xMax = s23xMax, zMin = s23zMin, zMax = s23zMax },
+	})
 
 	-- Lifts
 	buildLift(hotel, Config, "east") -- F1 ↔ F2
 	buildLift(hotel, Config, "west") -- F2 ↔ F3
 
 	-- Lift entrance corridor doors
-	local hw = rx / 2
-	local liftEX = cx + hw - 25
-	local liftWX = cx - hw + 25
 	createFloorDoor(Vector3.new(liftEX, cy + fh + 10, cz - 8), 0, hotel, "LiftDoor_F1E", Config.DOOR_DEBOUNCE)
 	createFloorDoor(Vector3.new(liftWX, cy + fh * 2 + 10, cz - 8), 0, hotel, "LiftDoor_F2W", Config.DOOR_DEBOUNCE)
 
@@ -840,22 +1174,31 @@ function RestaurantBuilder.build(Config)
 		floorFoodPositions[f] = buildTablesForFloor(hotel, f, Config)
 	end
 
+	-- Per-floor restaurant decoration: bar counter + wall paintings
+	for f = 1, Config.FLOOR_COUNT do
+		buildBarCounter(hotel, f, Config)
+		buildWallPaintings(hotel, f, Config)
+	end
+
 	-- Indoor ceiling lighting (keeps interior bright at night)
 	buildIndoorLighting(hotel, Config)
 
 	-- Lobby light-switch (toggles all indoor lights on/off)
 	buildLightSwitch(hotel, Config)
 
-	-- Staircases along interior walls between floors
-	-- F1 → F2: north interior area, heading east (+X direction), wide steps facing south
+	-- Staircases along interior walls between floors.
+	-- STEP_COUNT=12, STEP_HEIGHT=2 → 24-stud climb; fits within FLOOR_HEIGHT=25.
+	-- The floor slabs above have matching cutouts so players can pass through.
+
+	-- F1 → F2: north interior area, heading east (+X direction)
 	buildStaircase(
 		hotel,
 		"Stairs_F1_F2",
 		cx - 50, -- startX (west end)
-		cy + 0.5, -- startY (F1 floor)
+		cy + 0.5, -- startY (F1 floor surface)
 		cz + 130, -- startZ (near north interior wall)
 		1, -- dirX = +1 → ascending eastward
-		12 -- step width in Z
+		stairStepWidth -- step width in Z
 	)
 
 	-- F2 → F3: south interior area, heading west (−X direction)
@@ -863,14 +1206,19 @@ function RestaurantBuilder.build(Config)
 		hotel,
 		"Stairs_F2_F3",
 		cx + 50, -- startX (east end)
-		cy + fh + 0.5, -- startY (F2 floor)
+		cy + fh + 0.5, -- startY (F2 floor surface)
 		cz - 130, -- startZ (near south interior wall)
 		-1, -- dirX = −1 → ascending westward
-		12 -- step width in Z
+		stairStepWidth -- step width in Z
 	)
 
 	-- Parkour platforms and jump pads between floors
 	buildParkourElements(hotel, Config)
+
+	-- Exterior: entrance path, river, hills
+	buildEntrancePath(hotel, Config)
+	buildRiver(hotel, Config)
+	buildHills(hotel, Config)
 
 	return hotel, floorFoodPositions
 end

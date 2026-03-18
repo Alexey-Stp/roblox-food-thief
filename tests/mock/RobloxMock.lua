@@ -535,6 +535,12 @@ function TweenInfo.new(...)
     return {}
 end
 
+-- UDim2 constructor stub (used by SurfaceGui TextLabel sizes)
+UDim2 = {}
+function UDim2.new(sx, ox, sy, oy)
+    return { X = { Scale = sx or 0, Offset = ox or 0 }, Y = { Scale = sy or 0, Offset = oy or 0 } }
+end
+
 -- math.huge, math.rad, math.sqrt — already standard Lua
 -- os.clock, os.time — already standard Lua
 -- ipairs, pairs, type, tostring, table, string — all standard Lua
