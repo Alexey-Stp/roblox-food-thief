@@ -451,6 +451,13 @@ function workspace:FindFirstChild(name)
     return nil
 end
 
+function workspace:FindFirstChildOfClass(cls)
+    for _, c in ipairs(self._children) do
+        if c.ClassName == cls then return c end
+    end
+    return nil
+end
+
 function workspace:GetDescendants()
     local result = {}
     local function collect(obj)

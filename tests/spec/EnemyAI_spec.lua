@@ -51,7 +51,11 @@ local function makePlayer(name, position)
     local backpack = {
         _children = {},
     }
-    function backpack:GetChildren() return self._children end
+    function backpack:GetChildren()
+        local copy = {}
+        for i, c in ipairs(self._children) do copy[i] = c end
+        return copy
+    end
 
     local player = {
         Name      = name or "TestPlayer",
@@ -67,7 +71,7 @@ end
 local function addFoodToBackpack(backpack, foodName)
     local tool = Instance.new("Tool")
     tool.Name = foodName or "Pizza"
-    table.insert(backpack._children, tool)
+    tool.Parent = backpack
     return tool
 end
 
@@ -75,7 +79,7 @@ end
 local function addFoodToCharacter(character, foodName)
     local tool = Instance.new("Tool")
     tool.Name = foodName or "Pizza"
-    table.insert(character._children, tool)
+    tool.Parent = character
     return tool
 end
 
