@@ -358,38 +358,37 @@ end
 -- -------------------------------------------------------------------------
 local function buildTree(parent, position)
 	local trunk = Instance.new("Part")
-	trunk.Name      = "TreeTrunk"
-	trunk.Shape     = Enum.PartType.Cylinder
-	trunk.Size      = Vector3.new(8, 3, 3)
-	trunk.CFrame    = CFrame.new(position + Vector3.new(0, 4, 0))
-		* CFrame.Angles(0, 0, math.rad(90))
-	trunk.Anchored  = true
+	trunk.Name = "TreeTrunk"
+	trunk.Shape = Enum.PartType.Cylinder
+	trunk.Size = Vector3.new(8, 3, 3)
+	trunk.CFrame = CFrame.new(position + Vector3.new(0, 4, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	trunk.Anchored = true
 	trunk.BrickColor = BrickColor.new("Reddish brown")
-	trunk.Material  = Enum.Material.Wood
-	trunk.Parent    = parent
+	trunk.Material = Enum.Material.Wood
+	trunk.Parent = parent
 
 	local foliage = Instance.new("Part")
-	foliage.Name     = "TreeFoliage"
-	foliage.Shape    = Enum.PartType.Ball
-	foliage.Size     = Vector3.new(14, 14, 14)
+	foliage.Name = "TreeFoliage"
+	foliage.Shape = Enum.PartType.Ball
+	foliage.Size = Vector3.new(14, 14, 14)
 	foliage.Position = position + Vector3.new(0, 12, 0)
 	foliage.Anchored = true
 	foliage.BrickColor = BrickColor.new("Bright green")
 	foliage.Material = Enum.Material.Grass
-	foliage.Parent   = parent
+	foliage.Parent = parent
 end
 
 -- Trees placed in the corners and sides around the base platform
 local function buildBaseTrees(baseModel, basePosition)
 	local offsets = {
 		Vector3.new(-38, 0, -38),
-		Vector3.new( 38, 0, -38),
-		Vector3.new(-38, 0,  38),
-		Vector3.new( 38, 0,  38),
-		Vector3.new(  0, 0, -45),
-		Vector3.new(  0, 0,  45),
-		Vector3.new(-45, 0,   0),
-		Vector3.new( 45, 0,   0),
+		Vector3.new(38, 0, -38),
+		Vector3.new(-38, 0, 38),
+		Vector3.new(38, 0, 38),
+		Vector3.new(0, 0, -45),
+		Vector3.new(0, 0, 45),
+		Vector3.new(-45, 0, 0),
+		Vector3.new(45, 0, 0),
 	}
 	for _, offset in ipairs(offsets) do
 		buildTree(baseModel, basePosition + offset + Vector3.new(0, 1, 0))
@@ -401,48 +400,47 @@ end
 -- -------------------------------------------------------------------------
 local function buildPrizeBox(baseModel, basePosition)
 	local box = Instance.new("Part")
-	box.Name      = "PrizeBox"
-	box.Size      = Vector3.new(4, 4, 4)
-	box.Position  = basePosition + Vector3.new(18, 3, 15)
-	box.Anchored  = true
+	box.Name = "PrizeBox"
+	box.Size = Vector3.new(4, 4, 4)
+	box.Position = basePosition + Vector3.new(18, 3, 15)
+	box.Anchored = true
 	box.BrickColor = BrickColor.new("Bright yellow")
-	box.Material  = Enum.Material.Neon
-	box.Parent    = baseModel
+	box.Material = Enum.Material.Neon
+	box.Parent = baseModel
 
 	-- Decorative lid
 	local lid = Instance.new("Part")
-	lid.Name      = "PrizeBoxLid"
-	lid.Size      = Vector3.new(4.2, 0.5, 4.2)
-	lid.Position  = box.Position + Vector3.new(0, 2.25, 0)
-	lid.Anchored  = true
+	lid.Name = "PrizeBoxLid"
+	lid.Size = Vector3.new(4.2, 0.5, 4.2)
+	lid.Position = box.Position + Vector3.new(0, 2.25, 0)
+	lid.Anchored = true
 	lid.BrickColor = BrickColor.new("Bright orange")
-	lid.Material  = Enum.Material.Neon
-	lid.Parent    = baseModel
+	lid.Material = Enum.Material.Neon
+	lid.Parent = baseModel
 
 	local sign = Instance.new("Part")
-	sign.Name      = "PrizeBoxSign"
-	sign.Size      = Vector3.new(5, 1.5, 0.2)
-	sign.Position  = box.Position + Vector3.new(0, 3.5, -2.1)
-	sign.Anchored  = true
+	sign.Name = "PrizeBoxSign"
+	sign.Size = Vector3.new(5, 1.5, 0.2)
+	sign.Position = box.Position + Vector3.new(0, 3.5, -2.1)
+	sign.Anchored = true
 	sign.BrickColor = BrickColor.new("Black")
-	sign.Material  = Enum.Material.SmoothPlastic
-	sign.Parent    = baseModel
-	addSurfaceLabel(sign, Enum.NormalId.Front,
-		"PRIZE BOX!", Color3.new(1, 1, 0))
+	sign.Material = Enum.Material.SmoothPlastic
+	sign.Parent = baseModel
+	addSurfaceLabel(sign, Enum.NormalId.Front, "PRIZE BOX!", Color3.new(1, 1, 0))
 
 	local boxLight = Instance.new("PointLight")
-	boxLight.Color      = Color3.new(1, 0.8, 0)
+	boxLight.Color = Color3.new(1, 0.8, 0)
 	boxLight.Brightness = 2
-	boxLight.Range      = 12
-	boxLight.Parent     = box
+	boxLight.Range = 12
+	boxLight.Parent = box
 
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText            = "Open Prize Box"
-	prompt.ObjectText            = "Lucky Prize Box"
-	prompt.KeyboardKeyCode       = Enum.KeyCode.E
-	prompt.RequiresLineOfSight   = false
+	prompt.ActionText = "Open Prize Box"
+	prompt.ObjectText = "Lucky Prize Box"
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.RequiresLineOfSight = false
 	prompt.MaxActivationDistance = 8
-	prompt.Parent                = box
+	prompt.Parent = box
 
 	prompt.Triggered:Connect(function(player)
 		local now = tick()

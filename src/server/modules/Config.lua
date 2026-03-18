@@ -72,14 +72,14 @@ Config.JUMP_BOOST = 15 -- JumpPower added per purchase (hard cap: 100)
 -- -------------------------------------------------------------------------
 -- Prize box
 -- -------------------------------------------------------------------------
-Config.PRIZE_BOX_COOLDOWN  = 30    -- seconds between opens per player
-Config.PRIZE_BOX_MIN       = 5     -- minimum money reward
-Config.PRIZE_BOX_MAX       = 50    -- maximum money reward
+Config.PRIZE_BOX_COOLDOWN = 30 -- seconds between opens per player
+Config.PRIZE_BOX_MIN = 5 -- minimum money reward
+Config.PRIZE_BOX_MAX = 50 -- maximum money reward
 
 -- -------------------------------------------------------------------------
 -- Day / Night cycle
 -- -------------------------------------------------------------------------
-Config.DAY_LENGTH = 240    -- seconds for a full day/night cycle
+Config.DAY_LENGTH = 240 -- seconds for a full day/night cycle
 
 -- -------------------------------------------------------------------------
 -- Food type definitions
