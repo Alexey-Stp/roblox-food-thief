@@ -2,8 +2,6 @@
 -- Builds the world ground and the 3-floor Grand Hotel.
 -- Returns: hotel (Model), floorFoodPositions (table[floor][i] = {position, foodType})
 
-local TweenService = game:GetService("TweenService")
-
 local RestaurantBuilder = {}
 
 -- Door debounce timestamps (keyed by Part; cleaned up when door is destroyed)
@@ -532,7 +530,10 @@ local function buildLift(parent, Config, side)
 	local isAtBottom = true
 	local isMoving = false
 
-	-- Shared move logic: move the platform to the given target Y position
+	-- Shared move logic: moves the platform to the target Y position.
+	-- Uses a manual step loop instead of TweenService so that players
+	-- standing on the platform are co-moved each frame (TweenService on
+	-- an Anchored part does NOT carry passengers).
 	local function moveLift(targetIsBottom)
 		if isMoving then
 			return
@@ -545,15 +546,44 @@ local function buildLift(parent, Config, side)
 		isMoving = true
 
 		local targetY = targetIsBottom and (yLow + 0.5) or (yHigh + 0.5)
-		local tween = TweenService:Create(
-			platform,
-			TweenInfo.new(2, Enum.EasingStyle.Linear),
-			{ Position = Vector3.new(liftX, targetY, liftZ) }
-		)
-		tween:Play()
-		tween.Completed:Connect(function()
+		local startY  = platform.Position.Y
+		local duration = 2   -- seconds (same feel as before)
+		local elapsed  = 0
+		local STEP     = 0.05 -- 20 Hz update
+
+		task.spawn(function()
+			while elapsed < duration do
+				task.wait(STEP)
+				elapsed = math.min(elapsed + STEP, duration)
+				local t = elapsed / duration
+				local newY  = startY + (targetY - startY) * t
+				local delta = newY - platform.Position.Y
+				platform.Position = Vector3.new(liftX, newY, liftZ)
+
+				-- Co-move any players standing on the platform
+				for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
+					local char = plr.Character
+					if char then
+						local hrp = char:FindFirstChild("HumanoidRootPart")
+						if hrp then
+							local rel = hrp.Position - platform.Position
+							-- Player is "on" the platform when within the shaft
+							-- XZ footprint and within 0–6 studs above the surface.
+							if math.abs(rel.X) < (shaftSize / 2 - 1)
+								and math.abs(rel.Z) < (shaftSize / 2 - 1)
+								and rel.Y >= 0 and rel.Y < 6
+							then
+								hrp.CFrame = hrp.CFrame + Vector3.new(0, delta, 0)
+							end
+						end
+					end
+				end
+			end
+
+			-- Final snap to exact position
+			platform.Position = Vector3.new(liftX, targetY, liftZ)
 			isAtBottom = targetIsBottom
-			isMoving = false
+			isMoving   = false
 			if side == "east" then
 				prompt.ActionText = isAtBottom and "Ride to Floor 2 ↑" or "Ride to Floor 1 ↓"
 			else
@@ -994,6 +1024,82 @@ local function buildTree(parent, position)
 end
 
 -- -------------------------------------------------------------------------
+-- Exterior staircase on the east wall — 16 stone steps from ground to F2
+-- -------------------------------------------------------------------------
+local function buildExteriorStaircase(parent, Config)
+	local cx = Config.HOTEL_CENTER.X
+	local cy = Config.HOTEL_CENTER.Y
+	local cz = Config.HOTEL_CENTER.Z
+	local hw = Config.HOTEL_SIZE.X / 2 -- 175; east wall world X = cx + hw
+
+	local STEP_COUNT  = 16
+	local STEP_HEIGHT = 1.6  -- 16 × 1.6 = 25.6 ≈ one floor height
+	local STEP_DEPTH  = 3    -- each step protrudes 3 studs outward (east)
+	local STEP_WIDTH  = 8    -- staircase width (Z axis)
+	local STAIR_Z     = cz - 40  -- south side of east wall
+
+	-- Stone steps, each one deeper and higher than the last
+	for i = 1, STEP_COUNT do
+		local step = Instance.new("Part")
+		step.Name      = "ExtStep_" .. i
+		step.Size      = Vector3.new(STEP_DEPTH, STEP_HEIGHT, STEP_WIDTH)
+		step.Anchored  = true
+		step.CanCollide= true
+		step.BrickColor= BrickColor.new("Medium stone grey")
+		step.Material  = Enum.Material.SmoothPlastic
+		-- Each step is one STEP_DEPTH east of the wall and rises STEP_HEIGHT per step.
+		-- Positioning: centre X = wall face + i * STEP_DEPTH - STEP_DEPTH/2
+		step.Position  = Vector3.new(
+			cx + hw + (i - 0.5) * STEP_DEPTH,
+			cy + (i - 0.5) * STEP_HEIGHT,
+			STAIR_Z
+		)
+		step.Parent = parent
+
+		-- Subtle step light for night visibility
+		local light = Instance.new("SurfaceLight")
+		light.Face       = Enum.NormalId.Top
+		light.Brightness = 0.8
+		light.Range      = 5
+		light.Parent = step
+	end
+
+	-- Landing platform at the top, flush with the east wall at Floor 2 height
+	local landing = Instance.new("Part")
+	landing.Name      = "ExtStairLanding"
+	landing.Size      = Vector3.new(STEP_DEPTH * 2, 1, STEP_WIDTH)
+	landing.Anchored  = true
+	landing.CanCollide= true
+	landing.BrickColor= BrickColor.new("Medium stone grey")
+	landing.Material  = Enum.Material.Concrete
+	landing.Position  = Vector3.new(
+		cx + hw + STEP_DEPTH,
+		cy + Config.FLOOR_HEIGHT + 0.5,
+		STAIR_Z
+	)
+	landing.Parent = parent
+
+	-- Neon yellow railings on both Z sides (matches interior staircase style)
+	local totalLength = STEP_DEPTH * STEP_COUNT
+	for _, zOff in ipairs({ -STEP_WIDTH / 2 + 0.3, STEP_WIDTH / 2 - 0.3 }) do
+		local rail = Instance.new("Part")
+		rail.Name      = "ExtRail"
+		rail.Size      = Vector3.new(totalLength, 0.3, 0.3)
+		rail.Anchored  = true
+		rail.CanCollide= false
+		rail.BrickColor= BrickColor.new("Bright yellow")
+		rail.Material  = Enum.Material.Neon
+		-- Centre the railing horizontally along the staircase and tilt to match slope
+		rail.CFrame = CFrame.new(
+			cx + hw + totalLength / 2,
+			cy + Config.FLOOR_HEIGHT / 2 + 1.5,
+			STAIR_Z + zOff
+		) * CFrame.Angles(0, 0, -math.atan(STEP_HEIGHT / STEP_DEPTH))
+		rail.Parent = parent
+	end
+end
+
+-- -------------------------------------------------------------------------
 -- Trees scattered around the outside of the restaurant
 -- -------------------------------------------------------------------------
 local function buildRestaurantTrees(parent, Config)
@@ -1161,6 +1267,9 @@ function RestaurantBuilder.build(Config)
 
 	-- Decorative trees around the restaurant exterior
 	buildRestaurantTrees(hotel, Config)
+
+	-- Exterior staircase on the east wall (ground → Floor 2)
+	buildExteriorStaircase(hotel, Config)
 
 	-- Tables and food spawn positions per floor
 	local floorFoodPositions = {}

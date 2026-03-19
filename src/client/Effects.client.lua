@@ -58,3 +58,18 @@ FoodStolen.OnClientEvent:Connect(function(worldPosition)
 		origin:Destroy()
 	end)
 end)
+
+-- -------------------------------------------------------------------------
+-- Bat hit confirm: play a hit sound for the player who landed the swing
+-- -------------------------------------------------------------------------
+local BatHit = eventsFolder:WaitForChild("BatHit")
+BatHit.OnClientEvent:Connect(function()
+	local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	local s = Instance.new("Sound")
+	s.SoundId = "rbxassetid://5943191636"
+	s.Volume  = 0.8
+	s.Parent  = hrp
+	s:Play()
+	game:GetService("Debris"):AddItem(s, 2)
+end)

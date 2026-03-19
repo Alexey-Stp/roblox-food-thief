@@ -8,14 +8,14 @@ local Players = game:GetService("Players")
 local BaseBuilder = {}
 
 local GameSystems = nil
-local Config = nil
+local Config      = nil
 
 -- Per-player prize box cooldown timestamps
 local prizeBoxCooldowns = {}
 
 function BaseBuilder.init(gameSystems, config)
 	GameSystems = gameSystems
-	Config = config
+	Config      = config
 end
 
 -- -------------------------------------------------------------------------
@@ -40,9 +40,11 @@ local function addSurfaceLabel(parent, face, text, textColor)
 end
 
 -- -------------------------------------------------------------------------
--- Fridge
+-- Fridge — builds the physical fridge Part only.
+-- Interaction logic (level-up, value bonus, BillboardGui) is handled by
+-- RefrigeratorSystem.lua which scans workspace for Parts tagged "Fridge".
 -- -------------------------------------------------------------------------
-local function buildFridge(baseModel, position, fridgeIndex, fridgesTable)
+local function buildFridge(baseModel, position, fridgeIndex)
 	local fridge = Instance.new("Part")
 	fridge.Name = "Fridge" .. fridgeIndex
 	fridge.Size = Vector3.new(3, 4, 2)
@@ -50,6 +52,10 @@ local function buildFridge(baseModel, position, fridgeIndex, fridgesTable)
 	fridge.Anchored = true
 	fridge.BrickColor = BrickColor.new("Dark grey")
 	fridge.Material = Enum.Material.Metal
+	-- Tag for RefrigeratorSystem to locate and enhance
+	fridge:SetAttribute("FridgeId", fridgeIndex)
+	fridge:SetAttribute("FridgeLevel", 1)
+	fridge:SetAttribute("NextUpgradeCost", 100) -- math.floor(100 * 1^1.5)
 	fridge.Parent = baseModel
 
 	local door = Instance.new("Part")
@@ -69,104 +75,14 @@ local function buildFridge(baseModel, position, fridgeIndex, fridgesTable)
 	light.Range = 8
 	light.Parent = fridge
 
-	local countLabel = addSurfaceLabel(
+	addSurfaceLabel(
 		fridge,
 		Enum.NormalId.Front,
-		"Fridge " .. fridgeIndex .. ": 0/" .. Config.FRIDGE_CAPACITY,
+		"Fridge " .. fridgeIndex .. "\nLevel 1",
 		Color3.new(0, 1, 1)
 	)
 
-	local storedItems = {}
-	fridgesTable[fridgeIndex] = { part = fridge, items = storedItems, label = countLabel }
-
-	local storePrompt = Instance.new("ProximityPrompt")
-	storePrompt.ActionText = "Store Food"
-	storePrompt.ObjectText = "Refrigerator"
-	storePrompt.KeyboardKeyCode = Enum.KeyCode.E
-	storePrompt.RequiresLineOfSight = false
-	storePrompt.MaxActivationDistance = 8
-	storePrompt.Parent = fridge
-
-	storePrompt.Triggered:Connect(function(player)
-		if #storedItems >= Config.FRIDGE_CAPACITY then
-			return
-		end
-
-		local character = player.Character
-		if not character then
-			return
-		end
-
-		local tool = character:FindFirstChildOfClass("Tool") or player.Backpack:FindFirstChildOfClass("Tool")
-		if not tool then
-			return
-		end
-
-		local handle = tool:FindFirstChild("Handle")
-		if not handle then
-			return
-		end
-
-		local foodCopy = handle:Clone()
-		foodCopy.Size = handle.Size * 0.5
-		foodCopy.Position = fridge.Position + Vector3.new(math.random(-1, 1) * 0.5, 2.5, 0)
-		foodCopy.Anchored = true
-		foodCopy.CanCollide = false
-		foodCopy.Parent = baseModel
-
-		local toolName = tool.Name
-		table.insert(storedItems, { name = toolName, visual = foodCopy })
-		tool:Destroy()
-
-		countLabel.Text = "Fridge " .. fridgeIndex .. ": " .. #storedItems .. "/" .. Config.FRIDGE_CAPACITY
-
-		if GameSystems then
-			GameSystems.onFoodStored(player)
-		end
-	end)
-end
-
-local function buildUpgradeStation(baseModel, basePosition, fridgesTable)
-	local station = Instance.new("Part")
-	station.Name = "UpgradeStation"
-	station.Size = Vector3.new(4, 4, 4)
-	station.Position = basePosition + Vector3.new(-18, 3, -15)
-	station.Anchored = true
-	station.BrickColor = BrickColor.new("Bright blue")
-	station.Material = Enum.Material.Metal
-	station.Parent = baseModel
-
-	addSurfaceLabel(station, Enum.NormalId.Front, "Add Fridge\n[50 pts]", Color3.new(1, 1, 1))
-
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Upgrade"
-	prompt.ObjectText = "Fridge Station"
-	prompt.KeyboardKeyCode = Enum.KeyCode.E
-	prompt.RequiresLineOfSight = false
-	prompt.MaxActivationDistance = 8
-	prompt.Parent = station
-
-	prompt.Triggered:Connect(function(player)
-		local count = #fridgesTable
-		if count >= Config.MAX_FRIDGES then
-			return
-		end
-
-		local ls = player:FindFirstChild("leaderstats")
-		if not ls then
-			return
-		end
-		local score = ls:FindFirstChild("Score")
-		if not score or score.Value < Config.FRIDGE_UPGRADE_COST then
-			return
-		end
-
-		score.Value = score.Value - Config.FRIDGE_UPGRADE_COST
-
-		local newIndex = count + 1
-		local newPos = basePosition + Vector3.new(-12 + (newIndex - 1) * 7, 3, -15)
-		buildFridge(baseModel, newPos, newIndex, fridgesTable)
-	end)
+	return fridge
 end
 
 -- -------------------------------------------------------------------------
@@ -214,15 +130,18 @@ local function buildSellStand(baseModel, basePosition)
 
 		local totalEarned = 0
 		for _, tool in ipairs(tools) do
-			-- Find sell price from Config.FOOD_TYPES by tool name
-			local price = 0
-			for _, ft in ipairs(Config.FOOD_TYPES) do
-				if ft.name == tool.Name then
-					price = ft.sellPrice or 0
-					break
+			-- Prefer fridge-boosted CurrentSellPrice attribute; fall back to Config
+			local handle = tool:FindFirstChild("Handle")
+			local price = handle and handle:GetAttribute("CurrentSellPrice")
+			if not price or price == 0 then
+				for _, ft in ipairs(Config.FOOD_TYPES) do
+					if ft.name == tool.Name then
+						price = ft.sellPrice or 0
+						break
+					end
 				end
 			end
-			totalEarned = totalEarned + price
+			totalEarned = totalEarned + (price or 0)
 			tool:Destroy()
 		end
 
@@ -545,10 +464,10 @@ function BaseBuilder.build()
 	sign.Parent = baseModel
 	addSurfaceLabel(sign, Enum.NormalId.Front, "YOUR SAFE BASE\nStore & Sell Your Food!", Color3.new(0, 0, 0))
 
-	-- Fridges (start with 1)
-	local fridgesTable = {}
-	buildFridge(baseModel, basePosition + Vector3.new(-12, 3, -15), 1, fridgesTable)
-	buildUpgradeStation(baseModel, basePosition, fridgesTable)
+	-- Two fridges; RefrigeratorSystem.lua adds BillboardGui + upgrade interaction
+	for i = 1, Config.FRIDGE_COUNT do
+		buildFridge(baseModel, basePosition + Vector3.new(-12 + (i - 1) * 7, 3, -15), i)
+	end
 
 	-- Sell stand
 	buildSellStand(baseModel, basePosition)
