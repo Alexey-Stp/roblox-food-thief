@@ -378,15 +378,21 @@ function EnemyAI.spawn(creatureName, startPosition, Config, level)
 			RemoteEvents.HitFlash:FireClient(player)
 		end
 
+		-- Confiscate food tools but spare protected items (bat, carpet)
+		local function isProtected(item)
+			local h = item:FindFirstChild("Handle")
+			return h and (h:GetAttribute("IsBat") == true or h:GetAttribute("IsCarpet") == true)
+		end
+
 		local character = player.Character
 		if character then
 			local equipped = character:FindFirstChildOfClass("Tool")
-			if equipped then
+			if equipped and not isProtected(equipped) then
 				equipped:Destroy()
 			end
 		end
 		for _, item in ipairs(player.Backpack:GetChildren()) do
-			if item:IsA("Tool") then
+			if item:IsA("Tool") and not isProtected(item) then
 				item:Destroy()
 			end
 		end
@@ -412,10 +418,21 @@ function EnemyAI.spawn(creatureName, startPosition, Config, level)
 			for _, player in ipairs(Players:GetPlayers()) do
 				local char = player.Character
 				if char and char:FindFirstChild("HumanoidRootPart") then
-					local hasFood = char:FindFirstChildOfClass("Tool") ~= nil
+					-- Check for food: skip bat (IsBat) and carpet (IsCarpet) tools
+					local function isFoodTool(item)
+						if not item:IsA("Tool") then
+							return false
+						end
+						local h = item:FindFirstChild("Handle")
+						if h and (h:GetAttribute("IsBat") == true or h:GetAttribute("IsCarpet") == true) then
+							return false
+						end
+						return true
+					end
+					local hasFood = isFoodTool(char:FindFirstChildOfClass("Tool") or Instance.new("Part"))
 					if not hasFood then
 						for _, item in ipairs(player.Backpack:GetChildren()) do
-							if item:IsA("Tool") then
+							if isFoodTool(item) then
 								hasFood = true
 								break
 							end

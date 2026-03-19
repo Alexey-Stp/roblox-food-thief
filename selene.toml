@@ -3,3 +3,5 @@ std = "roblox"
 [lints]
 # Unused variables are common in Roblox callbacks; suppress warnings globally
 unused_variable = "allow"
+# Single-line if/then guards are idiomatic in Roblox Lua
+multiple_statements = "allow"

@@ -20,6 +20,13 @@ local FoodSystem = safeRequire(modules.FoodSystem, "FoodSystem")
 local EnemyAI = safeRequire(modules.EnemyAI, "EnemyAI")
 local BaseBuilder = safeRequire(modules.BaseBuilder, "BaseBuilder")
 local DayNight = safeRequire(modules.DayNight, "DayNight")
+-- New modules
+local BatCombat = safeRequire(modules.BatCombat, "BatCombat")
+local FoodInventory = safeRequire(modules.FoodInventory, "FoodInventory")
+local RefrigeratorSystem = safeRequire(modules.RefrigeratorSystem, "RefrigeratorSystem")
+local FlyingCarpet = safeRequire(modules.FlyingCarpet, "FlyingCarpet")
+local AirplaneSystem = safeRequire(modules.AirplaneSystem, "AirplaneSystem")
+local HunterAI = safeRequire(modules.HunterAI, "HunterAI")
 
 -- 1. Init scoring and DataStore first (players may have already joined)
 GameSystems.init(Config)
@@ -28,6 +35,12 @@ GameSystems.init(Config)
 FoodSystem.init(RemoteEvents, GameSystems)
 EnemyAI.init(RemoteEvents)
 BaseBuilder.init(GameSystems, Config)
+BatCombat.init(RemoteEvents, Config)
+FoodInventory.init(RemoteEvents, Config)
+RefrigeratorSystem.init(RemoteEvents, Config, GameSystems)
+FlyingCarpet.init(RemoteEvents, Config)
+AirplaneSystem.init(Config, GameSystems)
+HunterAI.init(RemoteEvents, Config)
 
 -- 3. Build the world
 print("[Main] Building Grand Hotel...")
@@ -39,6 +52,9 @@ BaseBuilder.build()
 print("[Main] Spawning food on tables...")
 task.wait(0.5)
 FoodSystem.spawnAll(floorFoodPositions)
+
+print("[Main] Spawning guards...")
+HunterAI.spawnAll()
 
 -- 4. Spawn per-floor creature types
 print("[Main] Spawning creatures...")
@@ -68,3 +84,7 @@ print("[Main] Game ready!")
 -- 5. Start day/night cycle
 print("[Main] Starting day/night cycle...")
 DayNight.start(Config.DAY_LENGTH)
+
+-- 6. Start event-driven systems
+AirplaneSystem.start()
+FlyingCarpet.start()

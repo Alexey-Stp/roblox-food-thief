@@ -55,11 +55,13 @@ Config.DOOR_DEBOUNCE = 0.5 -- seconds cooldown between door toggles
 Config.LIFT_DEBOUNCE = 3.0 -- seconds cooldown between lift rides
 
 -- -------------------------------------------------------------------------
--- Fridge storage (player base)
+-- Fridge storage (player base) — level-up system
 -- -------------------------------------------------------------------------
 Config.FRIDGE_CAPACITY = 10 -- items per refrigerator
-Config.FRIDGE_UPGRADE_COST = 50 -- score points to buy an additional fridge
-Config.MAX_FRIDGES = 5
+Config.FRIDGE_COUNT = 2 -- fixed number of fridges at base
+Config.FRIDGE_MAX_LEVEL = 10 -- maximum upgrade level
+Config.FRIDGE_UPGRADE_BASE_COST = 100 -- money cost; formula: floor(100 * level^1.5)
+-- Value bonus formula: finalPrice = basePrice * (1 + 0.3 * fridgeLevel)
 
 -- -------------------------------------------------------------------------
 -- Money & shop
@@ -95,6 +97,7 @@ Config.FOOD_TYPES = {
 		texture = "rbxassetid://6886896591",
 		sideTexture = "rbxassetid://6886896591",
 		sellPrice = 20,
+		rarity = "Common",
 	},
 	{
 		name = "Burger",
@@ -103,6 +106,7 @@ Config.FOOD_TYPES = {
 		texture = "rbxassetid://7229442422",
 		sideTexture = "rbxassetid://7229442422",
 		sellPrice = 15,
+		rarity = "Common",
 	},
 	{
 		name = "Cake",
@@ -111,6 +115,7 @@ Config.FOOD_TYPES = {
 		texture = "rbxassetid://7495147696",
 		sideTexture = "rbxassetid://7495147696",
 		sellPrice = 30,
+		rarity = "Rare",
 	},
 	{
 		name = "Bread",
@@ -119,6 +124,7 @@ Config.FOOD_TYPES = {
 		texture = "rbxassetid://6324656637",
 		sideTexture = "rbxassetid://6324656637",
 		sellPrice = 10,
+		rarity = "Common",
 	},
 	{
 		name = "Apple",
@@ -127,6 +133,7 @@ Config.FOOD_TYPES = {
 		texture = "rbxassetid://6886896313",
 		sideTexture = nil,
 		sellPrice = 8,
+		rarity = "Common",
 	},
 	{
 		name = "Donut",
@@ -135,6 +142,7 @@ Config.FOOD_TYPES = {
 		texture = "rbxassetid://7229442422",
 		sideTexture = nil,
 		sellPrice = 12,
+		rarity = "Common",
 	},
 	{
 		name = "Sushi",
@@ -143,6 +151,7 @@ Config.FOOD_TYPES = {
 		texture = "rbxassetid://6886896591",
 		sideTexture = nil,
 		sellPrice = 25,
+		rarity = "Rare",
 	},
 }
 
@@ -152,5 +161,43 @@ Config.FOOD_TYPES = {
 Config.SCORE_STEAL = 10
 Config.SCORE_STORE = 25
 Config.SCORE_COLLECT = 50
+
+-- -------------------------------------------------------------------------
+-- Bat combat (PvP)
+-- -------------------------------------------------------------------------
+Config.BAT_COOLDOWN = 0.8 -- seconds between swings (server-side)
+Config.BAT_DAMAGE = 20 -- HP removed per hit
+Config.BAT_RANGE = 10 -- studs; server spatial scan radius
+
+-- -------------------------------------------------------------------------
+-- Guard (hunter) NPCs — Floor 1 only
+-- -------------------------------------------------------------------------
+Config.GUARD_ALERT_RANGE = 60 -- studs: react to theft within this radius
+Config.GUARD_CATCH_RANGE = 5 -- studs: triggers catch sequence
+Config.GUARD_CHASE_SPEED = 14 -- WalkSpeed while chasing
+Config.GUARD_PATROL_SPEED = 6 -- WalkSpeed while patrolling
+Config.GUARD_CHASE_TIMEOUT = 20 -- seconds before guard abandons chase
+Config.GUARD_COUNT = 3 -- number of guards spawned on floor 1
+
+-- -------------------------------------------------------------------------
+-- Flying carpet (night reward)
+-- -------------------------------------------------------------------------
+Config.CARPET_SPAWN_POS = Vector3.new(-160, 3, 0) -- near restaurant entrance
+Config.CARPET_MAX_HEIGHT = 150 -- maximum flight altitude (Y studs)
+Config.CARPET_FLIGHT_SPEED = 30 -- horizontal studs/sec
+Config.CARPET_ASCENT_SPEED = 15 -- vertical studs/sec
+Config.CARPET_MAX_SPEED_VALIDATE = 55 -- server anti-exploit speed cap
+
+-- -------------------------------------------------------------------------
+-- Airplanes dropping food
+-- -------------------------------------------------------------------------
+Config.AIRPLANE_SPAWN_X = -800 -- west map edge spawn X
+Config.AIRPLANE_END_X = 800 -- east map edge destination X
+Config.AIRPLANE_ALTITUDE = 200 -- Y position during flight
+Config.AIRPLANE_SPEED = 100 -- studs/sec
+Config.AIRPLANE_INTERVAL_MIN = 90 -- min seconds between airplane events
+Config.AIRPLANE_INTERVAL_MAX = 180 -- max seconds between airplane events
+Config.AIRPLANE_DROP_INTERVAL = 8 -- seconds between food drops during flight
+Config.AIRPLANE_FOOD_DESPAWN = 30 -- seconds before dropped food disappears
 
 return Config

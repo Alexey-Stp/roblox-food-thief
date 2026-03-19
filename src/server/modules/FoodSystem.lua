@@ -75,8 +75,14 @@ local function createFood(foodType, position)
 		handle.BrickColor = foodType.color
 		handle.Material = Enum.Material.SmoothPlastic
 		addDecals(handle, foodType)
-		handle.Parent = tool
 
+		-- Food metadata attributes (used by fridge, sell stand, and give/drop systems)
+		handle:SetAttribute("BaseSellPrice", foodType.sellPrice)
+		handle:SetAttribute("CurrentSellPrice", foodType.sellPrice)
+		handle:SetAttribute("Rarity", foodType.rarity or "Common")
+		handle:SetAttribute("FoodId", foodType.name)
+
+		handle.Parent = tool
 		tool.Parent = player.Backpack
 
 		-- Notify client for sparkle effect
@@ -87,6 +93,11 @@ local function createFood(foodType, position)
 		-- Notify scoring system
 		if GameSystems then
 			GameSystems.onFoodStolen(player)
+		end
+
+		-- Alert guard NPCs (HunterAI listens on server side)
+		if RemoteEvents and RemoteEvents.FoodStolenServer then
+			RemoteEvents.FoodStolenServer:Fire(player, food.Position)
 		end
 
 		local respawnPos = Vector3.new(position.X, position.Y, position.Z)
