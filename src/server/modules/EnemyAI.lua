@@ -420,7 +420,9 @@ function EnemyAI.spawn(creatureName, startPosition, Config, level)
 				if char and char:FindFirstChild("HumanoidRootPart") then
 					-- Check for food: skip bat (IsBat) and carpet (IsCarpet) tools
 					local function isFoodTool(item)
-						if not item:IsA("Tool") then return false end
+						if not item:IsA("Tool") then
+							return false
+						end
 						local h = item:FindFirstChild("Handle")
 						if h and (h:GetAttribute("IsBat") == true or h:GetAttribute("IsCarpet") == true) then
 							return false

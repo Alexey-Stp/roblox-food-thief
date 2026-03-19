@@ -8,14 +8,14 @@ local Players = game:GetService("Players")
 local BaseBuilder = {}
 
 local GameSystems = nil
-local Config      = nil
+local Config = nil
 
 -- Per-player prize box cooldown timestamps
 local prizeBoxCooldowns = {}
 
 function BaseBuilder.init(gameSystems, config)
 	GameSystems = gameSystems
-	Config      = config
+	Config = config
 end
 
 -- -------------------------------------------------------------------------
@@ -75,12 +75,7 @@ local function buildFridge(baseModel, position, fridgeIndex)
 	light.Range = 8
 	light.Parent = fridge
 
-	addSurfaceLabel(
-		fridge,
-		Enum.NormalId.Front,
-		"Fridge " .. fridgeIndex .. "\nLevel 1",
-		Color3.new(0, 1, 1)
-	)
+	addSurfaceLabel(fridge, Enum.NormalId.Front, "Fridge " .. fridgeIndex .. "\nLevel 1", Color3.new(0, 1, 1))
 
 	return fridge
 end

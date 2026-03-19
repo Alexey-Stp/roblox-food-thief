@@ -45,16 +45,16 @@ local SKY_PRESETS = {
 	}, -- dusk
 	{
 		hour = 20,
-		ambient = Color3.fromRGB(60, 60, 90),   -- lifted: was (30,30,50)
-		outdoor = Color3.fromRGB(70, 70, 110),  -- lifted: was (40,40,70)
-		brightness = 1.2,                        -- lifted: was 0.6
+		ambient = Color3.fromRGB(60, 60, 90), -- lifted: was (30,30,50)
+		outdoor = Color3.fromRGB(70, 70, 110), -- lifted: was (40,40,70)
+		brightness = 1.2, -- lifted: was 0.6
 		fogColor = Color3.fromRGB(50, 50, 80),
 	}, -- evening
 	{
 		hour = 24,
-		ambient = Color3.fromRGB(45, 45, 75),   -- lifted: was (15,15,30)
-		outdoor = Color3.fromRGB(55, 55, 90),   -- lifted: was (20,20,40)
-		brightness = 0.8,                        -- lifted: was 0.3
+		ambient = Color3.fromRGB(45, 45, 75), -- lifted: was (15,15,30)
+		outdoor = Color3.fromRGB(55, 55, 90), -- lifted: was (20,20,40)
+		brightness = 0.8, -- lifted: was 0.3
 		fogColor = Color3.fromRGB(40, 40, 70),
 	}, -- midnight
 }
@@ -114,8 +114,8 @@ local function applyLighting(hour)
 
 	-- Fog distance: less obscuring at night so players can navigate
 	local isNight = (hour >= NIGHT_START_HOUR or hour < NIGHT_END_HOUR)
-	Lighting.FogEnd   = isNight and 900 or 2000  -- was 600
-	Lighting.FogStart = isNight and 400 or 800   -- was 200
+	Lighting.FogEnd = isNight and 900 or 2000 -- was 600
+	Lighting.FogStart = isNight and 400 or 800 -- was 200
 end
 
 -- -------------------------------------------------------------------------

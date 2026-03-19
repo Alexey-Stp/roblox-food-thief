@@ -86,18 +86,26 @@ function BatCombat.init(remoteEvents, config)
 	RemoteEvents.BatSwing.OnServerEvent:Connect(function(player, _aimPos)
 		-- 1. Confirm the bat is currently equipped
 		local char = player.Character
-		if not char then return end
+		if not char then
+			return
+		end
 		local equipped = char:FindFirstChildWhichIsA("Tool")
-		if not equipped or equipped.Name ~= "Bat" then return end
+		if not equipped or equipped.Name ~= "Bat" then
+			return
+		end
 
 		-- 2. Cooldown check — stamp immediately so duplicate packets are rejected
 		local now = tick()
-		if now - (cooldowns[player.UserId] or 0) < Config.BAT_COOLDOWN then return end
+		if now - (cooldowns[player.UserId] or 0) < Config.BAT_COOLDOWN then
+			return
+		end
 		cooldowns[player.UserId] = now
 
 		-- 3. Server-side spatial scan — never trust the client's target hint
 		local myHRP = char:FindFirstChild("HumanoidRootPart")
-		if not myHRP then return end
+		if not myHRP then
+			return
+		end
 
 		for _, other in ipairs(Players:GetPlayers()) do
 			if other ~= player and other.Character then
