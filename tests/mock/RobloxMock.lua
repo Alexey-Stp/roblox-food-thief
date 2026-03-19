@@ -544,3 +544,12 @@ end
 -- math.huge, math.rad, math.sqrt — already standard Lua
 -- os.clock, os.time — already standard Lua
 -- ipairs, pairs, type, tostring, table, string — all standard Lua
+
+-- table.clone — Roblox extension; polyfill for LuaJIT / Lua 5.1
+if not table.clone then
+    table.clone = function(t)
+        local copy = {}
+        for k, v in pairs(t) do copy[k] = v end
+        return copy
+    end
+end
