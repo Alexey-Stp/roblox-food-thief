@@ -138,6 +138,15 @@ function Instance.new(className)
         RequiresHandle   = false,
     }
 
+    -- Attribute storage
+    local _attributes = {}
+    function inst:SetAttribute(key, value)
+        _attributes[key] = value
+    end
+    function inst:GetAttribute(key)
+        return _attributes[key]
+    end
+
     -- -----------------------------------------------------------------------
     -- Child management
     -- -----------------------------------------------------------------------

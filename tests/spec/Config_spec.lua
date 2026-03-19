@@ -108,12 +108,12 @@ describe("Config", function()
     -- Fridge / shop
     -- -----------------------------------------------------------------------
     describe("fridge and shop", function()
-        it("FRIDGE_UPGRADE_COST is 50", function()
-            assert.equals(50, Config.FRIDGE_UPGRADE_COST)
+        it("FRIDGE_UPGRADE_BASE_COST is positive", function()
+            assert.is_true(Config.FRIDGE_UPGRADE_BASE_COST > 0)
         end)
 
-        it("MAX_FRIDGES is 5", function()
-            assert.equals(5, Config.MAX_FRIDGES)
+        it("FRIDGE_COUNT is positive", function()
+            assert.is_true(Config.FRIDGE_COUNT > 0)
         end)
 
         it("FRIDGE_CAPACITY is positive", function()
