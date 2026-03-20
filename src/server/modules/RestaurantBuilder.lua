@@ -1129,14 +1129,11 @@ local function buildWorldTrees(parent, Config)
 		local tx = rng:NextNumber(-MAP_HALF, MAP_HALF)
 		local tz = rng:NextNumber(-MAP_HALF, MAP_HALF)
 		-- Skip hotel footprint and base area
-		if math.abs(tx - cx) < hotelHalfX and math.abs(tz - cz) < hotelHalfZ then
-			continue
+		local inHotel = math.abs(tx - cx) < hotelHalfX and math.abs(tz - cz) < hotelHalfZ
+		if not inHotel and tx <= baseMinX then
+			buildTree(parent, Vector3.new(tx, 0.5, tz))
+			placed = placed + 1
 		end
-		if tx > baseMinX then
-			continue
-		end
-		buildTree(parent, Vector3.new(tx, 0.5, tz))
-		placed = placed + 1
 	end
 end
 
