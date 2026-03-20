@@ -139,9 +139,24 @@ local function buildHealingFoods(parent)
 	local respawnTime = Config.SKY_HOTEL_FOOD_RESPAWN
 
 	local foodDefs = {
-		{ name = "Sky Apple", color = "Bright red", heal = healValues[1], pos = Vector3.new(center.X - 20, y + 4, center.Z - 20) },
-		{ name = "Star Berry", color = "Bright violet", heal = healValues[2], pos = Vector3.new(center.X + 20, y + 4, center.Z - 20) },
-		{ name = "Cloud Cake", color = "White", heal = healValues[3], pos = Vector3.new(center.X, y + 4, center.Z + 20) },
+		{
+			name = "Sky Apple",
+			color = "Bright red",
+			heal = healValues[1],
+			pos = Vector3.new(center.X - 20, y + 4, center.Z - 20),
+		},
+		{
+			name = "Star Berry",
+			color = "Bright violet",
+			heal = healValues[2],
+			pos = Vector3.new(center.X + 20, y + 4, center.Z - 20),
+		},
+		{
+			name = "Cloud Cake",
+			color = "White",
+			heal = healValues[3],
+			pos = Vector3.new(center.X, y + 4, center.Z + 20),
+		},
 	}
 
 	for _, def in ipairs(foodDefs) do
@@ -157,13 +172,27 @@ local function buildHealingFoods(parent)
 		pedestal.Reflectance = 0.1
 
 		-- Food visual sphere
-		local foodPart = makePart("HealingFood_" .. def.name, Vector3.new(1.8, 1.8, 1.8), def.pos, def.color, Enum.Material.SmoothPlastic, parent)
+		local foodPart = makePart(
+			"HealingFood_" .. def.name,
+			Vector3.new(1.8, 1.8, 1.8),
+			def.pos,
+			def.color,
+			Enum.Material.SmoothPlastic,
+			parent
+		)
 		foodPart.Shape = Enum.PartType.Ball
 		foodPart.Reflectance = 0.25
 		foodPart.CastShadow = false
 
 		-- Neon glow dot above the food
-		local glow = makePart("FoodGlow", Vector3.new(0.5, 0.5, 0.5), def.pos + Vector3.new(0, 1.5, 0), "Bright green", Enum.Material.Neon, parent)
+		local glow = makePart(
+			"FoodGlow",
+			Vector3.new(0.5, 0.5, 0.5),
+			def.pos + Vector3.new(0, 1.5, 0),
+			"Bright green",
+			Enum.Material.Neon,
+			parent
+		)
 		glow.Shape = Enum.PartType.Ball
 		glow.CanCollide = false
 
@@ -231,7 +260,14 @@ local function buildChest(parent)
 	body.Reflectance = 0.05
 
 	-- Lid
-	local lid = makePart("ChestLid", Vector3.new(3, 0.5, 2), chestPos + Vector3.new(0, 1.5, 0), "Bright yellow", Enum.Material.Wood, parent)
+	local lid = makePart(
+		"ChestLid",
+		Vector3.new(3, 0.5, 2),
+		chestPos + Vector3.new(0, 1.5, 0),
+		"Bright yellow",
+		Enum.Material.Wood,
+		parent
+	)
 	lid.Reflectance = 0.08
 	lid.CanCollide = false
 
