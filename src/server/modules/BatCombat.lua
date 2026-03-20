@@ -162,7 +162,8 @@ function BatCombat.init(remoteEvents, config)
 						if part:IsA("BasePart") and (part.Name == "Door" or part.Name == "Wall") then
 							local dist = (part.Position - myHRP.Position).Magnitude
 							if dist <= Config.BAT_RANGE then
-								local hp = (part:GetAttribute("Health") or Config.CASTLE_PART_HEALTH) - Config.BAT_DAMAGE
+								local hp = (part:GetAttribute("Health") or Config.CASTLE_PART_HEALTH)
+									- Config.BAT_DAMAGE
 								if hp <= 0 then
 									-- Part destroyed: make intangible, remove after a short delay
 									part.Transparency = 1
