@@ -63,6 +63,12 @@ local RemoteEvents = {
 	CarpetSpawned = getOrCreate(eventsFolder, "CarpetSpawned", "RemoteEvent"),
 
 	-- -----------------------------------------------------------------------
+	-- Chest-loot weapons (Pistol / Rifle)
+	-- -----------------------------------------------------------------------
+	-- Client → Server: player fired a weapon (server raycasts + applies damage)
+	ShootWeapon = getOrCreate(eventsFolder, "ShootWeapon", "RemoteEvent"),
+
+	-- -----------------------------------------------------------------------
 	-- Server-to-server signal (BindableEvent — never replicated to clients)
 	-- Fires when any player steals food; HunterAI listens to alert guards.
 	-- -----------------------------------------------------------------------

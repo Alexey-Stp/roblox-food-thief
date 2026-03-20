@@ -196,22 +196,6 @@ local function buildHealingFoods(parent)
 		glow.Shape = Enum.PartType.Ball
 		glow.CanCollide = false
 
-		-- Floating label
-		local bb = Instance.new("BillboardGui")
-		bb.Size = UDim2.new(0, 120, 0, 36)
-		bb.StudsOffset = Vector3.new(0, 2.5, 0)
-		bb.AlwaysOnTop = false
-		bb.Parent = foodPart
-
-		local lbl = Instance.new("TextLabel")
-		lbl.Size = UDim2.new(1, 0, 1, 0)
-		lbl.Text = def.name .. "\n+" .. def.heal .. " HP"
-		lbl.TextColor3 = Color3.fromRGB(100, 255, 120)
-		lbl.BackgroundTransparency = 1
-		lbl.TextScaled = true
-		lbl.Font = Enum.Font.GothamBold
-		lbl.Parent = bb
-
 		-- ProximityPrompt — server-side health restoration
 		local pp = Instance.new("ProximityPrompt")
 		pp.ActionText = "Eat"
@@ -275,22 +259,6 @@ local function buildChest(parent)
 	weld.Part0 = body
 	weld.Part1 = lid
 	weld.Parent = body
-
-	-- Floating label
-	local bb = Instance.new("BillboardGui")
-	bb.Size = UDim2.new(0, 160, 0, 30)
-	bb.StudsOffset = Vector3.new(0, 3, 0)
-	bb.AlwaysOnTop = false
-	bb.Parent = body
-
-	local lbl = Instance.new("TextLabel")
-	lbl.Size = UDim2.new(1, 0, 1, 0)
-	lbl.Text = "✨ Magic Carpet Chest"
-	lbl.TextColor3 = Color3.fromRGB(255, 220, 60)
-	lbl.BackgroundTransparency = 1
-	lbl.TextScaled = true
-	lbl.Font = Enum.Font.GothamBold
-	lbl.Parent = bb
 
 	-- ProximityPrompt
 	local pp = Instance.new("ProximityPrompt")

@@ -4,6 +4,7 @@
 --   W/A/S/D  — camera-relative horizontal flight
 --   Space    — ascend
 --   LeftShift— descend
+-- Uses LinearVelocity + AlignOrientation constraints for smooth physics.
 -- Periodically sends the local HumanoidRootPart position to the server
 -- (CarpetPositionUpdate) so it can validate speed and height.
 
@@ -21,67 +22,77 @@ local CarpetPositionUpdate = eventsFolder:WaitForChild("CarpetPositionUpdate")
 local CarpetRevoked = eventsFolder:WaitForChild("CarpetRevoked")
 local CarpetSpawned = eventsFolder:WaitForChild("CarpetSpawned")
 
-local FLIGHT_SPEED = 30 -- horizontal studs/sec (matches Config.CARPET_FLIGHT_SPEED)
-local ASCENT_SPEED = 15 -- vertical studs/sec   (matches Config.CARPET_ASCENT_SPEED)
-local DESCENT_SPEED = 8 -- gentle fall when not pressing Shift
+local FLIGHT_SPEED  = 60 -- horizontal studs/sec (matches Config.CARPET_FLIGHT_SPEED)
+local ASCENT_SPEED  = 15 -- vertical studs/sec   (matches Config.CARPET_ASCENT_SPEED)
+local DESCENT_SPEED = 8  -- gentle fall when pressing Shift
 
 -- -------------------------------------------------------------------------
--- Active flight connection (disconnected when carpet is unequipped/revoked)
+-- Active flight state
 -- -------------------------------------------------------------------------
-local flightConnection = nil
-local reportTimer = 0
-local REPORT_INTERVAL = 0.1 -- seconds between server position reports
+local flightConnection    = nil
+local flightAttachment    = nil
+local flightLinearVel     = nil
+local flightAlignOrient   = nil
+local reportTimer         = 0
+local REPORT_INTERVAL     = 0.1 -- seconds between server position reports
 
+-- -------------------------------------------------------------------------
+-- Start / stop flight using constraint-based physics
+-- -------------------------------------------------------------------------
 local function startFlight(character)
 	if flightConnection then
 		return
 	end -- already flying
 
-	local hrp = character:WaitForChild("HumanoidRootPart")
+	local hrp      = character:WaitForChild("HumanoidRootPart")
 	local humanoid = character:WaitForChild("Humanoid")
 
-	-- Disable automatic character jumping so Space controls ascent
 	humanoid.PlatformStand = false
+
+	-- Attachment anchored to HRP (required by both constraints)
+	flightAttachment = Instance.new("Attachment")
+	flightAttachment.Name = "FlightAttachment"
+	flightAttachment.Parent = hrp
+
+	-- LinearVelocity drives movement; MaxForce overrides gravity/friction
+	flightLinearVel = Instance.new("LinearVelocity")
+	flightLinearVel.Attachment0 = flightAttachment
+	flightLinearVel.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+	flightLinearVel.RelativeTo = Enum.ActuatorRelativeTo.World
+	flightLinearVel.MaxForce = 1e6
+	flightLinearVel.VectorVelocity = Vector3.zero
+	flightLinearVel.Parent = hrp
+
+	-- AlignOrientation keeps the character upright (no tumbling during flight)
+	flightAlignOrient = Instance.new("AlignOrientation")
+	flightAlignOrient.Attachment0 = flightAttachment
+	flightAlignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	flightAlignOrient.MaxTorque = 1e6
+	flightAlignOrient.Responsiveness = 10
+	flightAlignOrient.CFrame = CFrame.new() -- world-up aligned
+	flightAlignOrient.Parent = hrp
 
 	flightConnection = RunService.Heartbeat:Connect(function(dt)
 		-- Stop if carpet was removed
 		if not character:FindFirstChild("FlyingCarpet") then
-			flightConnection:Disconnect()
-			flightConnection = nil
-			hrp.AssemblyLinearVelocity = Vector3.zero
-			humanoid.PlatformStand = false
+			stopFlight(character) -- defined below; forward reference is fine in Lua
 			return
 		end
 
 		-- Camera-relative horizontal direction
-		local cam = workspace.CurrentCamera
+		local cam     = workspace.CurrentCamera
 		local forward = Vector3.new(cam.CFrame.LookVector.X, 0, cam.CFrame.LookVector.Z)
-		local right = Vector3.new(cam.CFrame.RightVector.X, 0, cam.CFrame.RightVector.Z)
+		local right   = Vector3.new(cam.CFrame.RightVector.X, 0, cam.CFrame.RightVector.Z)
 
-		-- Normalize only if non-zero to avoid NaN
-		if forward.Magnitude > 0 then
-			forward = forward.Unit
-		end
-		if right.Magnitude > 0 then
-			right = right.Unit
-		end
+		if forward.Magnitude > 0 then forward = forward.Unit end
+		if right.Magnitude   > 0 then right   = right.Unit   end
 
 		local moveDir = Vector3.zero
-		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-			moveDir = moveDir + forward
-		end
-		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-			moveDir = moveDir - forward
-		end
-		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-			moveDir = moveDir - right
-		end
-		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-			moveDir = moveDir + right
-		end
-		if moveDir.Magnitude > 0 then
-			moveDir = moveDir.Unit
-		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + forward end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - forward end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - right   end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + right   end
+		if moveDir.Magnitude > 0 then moveDir = moveDir.Unit end
 
 		local vertical = 0
 		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
@@ -90,7 +101,7 @@ local function startFlight(character)
 			vertical = -DESCENT_SPEED
 		end
 
-		hrp.AssemblyLinearVelocity = moveDir * FLIGHT_SPEED + Vector3.new(0, vertical, 0)
+		flightLinearVel.VectorVelocity = moveDir * FLIGHT_SPEED + Vector3.new(0, vertical, 0)
 
 		-- Periodic position report to server for validation
 		reportTimer = reportTimer + dt
@@ -101,11 +112,24 @@ local function startFlight(character)
 	end)
 end
 
-local function stopFlight(character)
+function stopFlight(character)
 	if flightConnection then
 		flightConnection:Disconnect()
 		flightConnection = nil
 	end
+	if flightLinearVel then
+		flightLinearVel:Destroy()
+		flightLinearVel = nil
+	end
+	if flightAlignOrient then
+		flightAlignOrient:Destroy()
+		flightAlignOrient = nil
+	end
+	if flightAttachment then
+		flightAttachment:Destroy()
+		flightAttachment = nil
+	end
+	-- Zero out residual velocity as a safety net
 	local hrp = character and character:FindFirstChild("HumanoidRootPart")
 	if hrp then
 		hrp.AssemblyLinearVelocity = Vector3.zero
@@ -149,7 +173,6 @@ end
 -- -------------------------------------------------------------------------
 CarpetRevoked.OnClientEvent:Connect(function()
 	stopFlight(localPlayer.Character)
-	-- Optional: show a brief screen notification
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "CarpetRevokedGui"
 	screenGui.ResetOnSpawn = false
@@ -165,7 +188,7 @@ CarpetRevoked.OnClientEvent:Connect(function()
 
 	local lbl = Instance.new("TextLabel")
 	lbl.Size = UDim2.new(1, 0, 1, 0)
-	lbl.Text = "☀  The flying carpet vanished at dawn!"
+	lbl.Text = "The flying carpet vanished at dawn!"
 	lbl.TextColor3 = Color3.fromRGB(255, 180, 50)
 	lbl.BackgroundTransparency = 1
 	lbl.TextScaled = true
@@ -194,7 +217,7 @@ CarpetSpawned.OnClientEvent:Connect(function()
 
 	local lbl = Instance.new("TextLabel")
 	lbl.Size = UDim2.new(1, 0, 1, 0)
-	lbl.Text = "🌙  A Flying Carpet appeared near the restaurant!"
+	lbl.Text = "A Flying Carpet appeared near the restaurant!"
 	lbl.TextColor3 = Color3.fromRGB(180, 130, 255)
 	lbl.BackgroundTransparency = 1
 	lbl.TextScaled = true
