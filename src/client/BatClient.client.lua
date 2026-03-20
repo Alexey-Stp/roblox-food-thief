@@ -37,7 +37,10 @@ local function hookBatTool(tool)
 		local humanoid = character:FindFirstChildOfClass("Humanoid")
 		if humanoid then
 			local animator = humanoid:FindFirstChildOfClass("Animator")
-				or Instance.new("Animator", humanoid)
+			if not animator then
+				animator = Instance.new("Animator")
+				animator.Parent = humanoid
+			end
 			local anim = Instance.new("Animation")
 			anim.AnimationId = "rbxassetid://522635514"
 			local ok, track = pcall(function()

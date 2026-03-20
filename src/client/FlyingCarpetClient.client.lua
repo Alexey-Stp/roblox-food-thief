@@ -84,15 +84,29 @@ local function startFlight(character)
 		local forward = Vector3.new(cam.CFrame.LookVector.X, 0, cam.CFrame.LookVector.Z)
 		local right   = Vector3.new(cam.CFrame.RightVector.X, 0, cam.CFrame.RightVector.Z)
 
-		if forward.Magnitude > 0 then forward = forward.Unit end
-		if right.Magnitude   > 0 then right   = right.Unit   end
+		if forward.Magnitude > 0 then
+			forward = forward.Unit
+		end
+		if right.Magnitude > 0 then
+			right = right.Unit
+		end
 
 		local moveDir = Vector3.zero
-		if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + forward end
-		if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - forward end
-		if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - right   end
-		if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + right   end
-		if moveDir.Magnitude > 0 then moveDir = moveDir.Unit end
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+			moveDir = moveDir + forward
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+			moveDir = moveDir - forward
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+			moveDir = moveDir - right
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+			moveDir = moveDir + right
+		end
+		if moveDir.Magnitude > 0 then
+			moveDir = moveDir.Unit
+		end
 
 		local vertical = 0
 		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
