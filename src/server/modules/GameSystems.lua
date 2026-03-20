@@ -174,10 +174,10 @@ local function loadPlayer(player)
 	money.Value = 0
 	money.Parent = ls
 
-	-- Initialise runtime settings with safe defaults (WalkSpeed=16, JumpPower=50)
+	-- Initialise runtime settings with game defaults
 	playerSettings[player.UserId] = {
-		walkSpeed = 16,
-		jumpPower = 50,
+		walkSpeed = Config.DEFAULT_WALK_SPEED,
+		jumpPower = Config.DEFAULT_JUMP_POWER,
 		collectedFood = {},
 	}
 
@@ -191,9 +191,12 @@ local function loadPlayer(player)
 			score.Value = data.score or 0
 			money.Value = data.money or 0
 
-			-- Restore WalkSpeed / JumpPower (default to Roblox defaults if absent)
-			playerSettings[player.UserId].walkSpeed = data.walkSpeed or 16
-			playerSettings[player.UserId].jumpPower = data.jumpPower or 50
+			-- Restore WalkSpeed / JumpPower; ensure saved values never go below the
+			-- current default (old saves may have stored the pre-update 16/50 values)
+			playerSettings[player.UserId].walkSpeed =
+				math.max(data.walkSpeed or Config.DEFAULT_WALK_SPEED, Config.DEFAULT_WALK_SPEED)
+			playerSettings[player.UserId].jumpPower =
+				math.max(data.jumpPower or Config.DEFAULT_JUMP_POWER, Config.DEFAULT_JUMP_POWER)
 
 			-- Restore collectedFood set from the saved list
 			if type(data.collectedFood) == "table" then

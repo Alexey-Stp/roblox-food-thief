@@ -107,22 +107,6 @@ local function buildGuard(name, startPos)
 	humanoid.Health = 100
 	humanoid.Parent = model
 
-	-- Name BillboardGui so players can see the guard
-	local bb = Instance.new("BillboardGui")
-	bb.Size = UDim2.new(0, 160, 0, 28)
-	bb.StudsOffset = Vector3.new(0, 2, 0)
-	bb.AlwaysOnTop = false
-	bb.Parent = head
-
-	local lbl = Instance.new("TextLabel")
-	lbl.Size = UDim2.new(1, 0, 1, 0)
-	lbl.Text = name
-	lbl.TextColor3 = Color3.new(1, 0.2, 0.2)
-	lbl.BackgroundTransparency = 1
-	lbl.TextScaled = true
-	lbl.Font = Enum.Font.SourceSansBold
-	lbl.Parent = bb
-
 	model.Parent = workspace
 	return model, torso, humanoid
 end

@@ -68,8 +68,12 @@ Config.FRIDGE_UPGRADE_BASE_COST = 100 -- money cost; formula: floor(100 * level^
 -- -------------------------------------------------------------------------
 Config.SHOP_SPEED_COST = 100 -- money to buy one speed boost
 Config.SHOP_JUMP_COST = 150 -- money to buy one jump boost
-Config.SPEED_BOOST = 8 -- WalkSpeed added per purchase (hard cap: 40)
-Config.JUMP_BOOST = 15 -- JumpPower added per purchase (hard cap: 100)
+Config.SPEED_BOOST = 8 -- WalkSpeed added per purchase
+Config.JUMP_BOOST = 15 -- JumpPower added per purchase
+
+-- Default starting movement values (applied on every spawn)
+Config.DEFAULT_WALK_SPEED = 500
+Config.DEFAULT_JUMP_POWER = 500
 
 -- -------------------------------------------------------------------------
 -- Prize box
@@ -190,9 +194,9 @@ Config.GUARD_COUNT = 3 -- number of guards spawned on floor 1
 -- -------------------------------------------------------------------------
 Config.CARPET_SPAWN_POS = Vector3.new(-160, 3, 0) -- near restaurant entrance
 Config.CARPET_MAX_HEIGHT = 150 -- maximum flight altitude (Y studs)
-Config.CARPET_FLIGHT_SPEED = 30 -- horizontal studs/sec
+Config.CARPET_FLIGHT_SPEED = 60 -- horizontal studs/sec
 Config.CARPET_ASCENT_SPEED = 15 -- vertical studs/sec
-Config.CARPET_MAX_SPEED_VALIDATE = 55 -- server anti-exploit speed cap
+Config.CARPET_MAX_SPEED_VALIDATE = 80 -- server anti-exploit speed cap
 
 -- -------------------------------------------------------------------------
 -- Airplanes dropping food

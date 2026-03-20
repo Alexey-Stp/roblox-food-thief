@@ -28,6 +28,8 @@ local FlyingCarpet = safeRequire(modules.FlyingCarpet, "FlyingCarpet")
 local AirplaneSystem = safeRequire(modules.AirplaneSystem, "AirplaneSystem")
 local HunterAI = safeRequire(modules.HunterAI, "HunterAI")
 local SkyHotel = safeRequire(modules.SkyHotel, "SkyHotel")
+local AmbientCreatures = safeRequire(modules.AmbientCreatures, "AmbientCreatures")
+local ChestSystem = safeRequire(modules.ChestSystem, "ChestSystem")
 
 -- 1. Init scoring and DataStore first (players may have already joined)
 GameSystems.init(Config)
@@ -43,6 +45,8 @@ FlyingCarpet.init(RemoteEvents, Config)
 AirplaneSystem.init(Config, GameSystems)
 HunterAI.init(RemoteEvents, Config)
 SkyHotel.init(Config)
+AmbientCreatures.init()
+ChestSystem.init(RemoteEvents, Config)
 
 -- 3. Build the world
 print("[Main] Building Grand Hotel...")
@@ -83,6 +87,12 @@ for level = 1, Config.FLOOR_COUNT do
 		EnemyAI.spawn(name, spawnPos, Config, level)
 	end
 end
+
+print("[Main] Spawning ambient creatures...")
+AmbientCreatures.spawnAll()
+
+print("[Main] Spawning loot chests...")
+ChestSystem.spawnAll()
 
 print("[Main] Game ready!")
 

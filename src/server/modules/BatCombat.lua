@@ -116,19 +116,29 @@ function BatCombat.init(remoteEvents, config)
 
 		local hitConfirmed = false
 
-		-- ── 4a. PvP: scan other players ──────────────────────────────────
-		for _, other in ipairs(Players:GetPlayers()) do
-			if other ~= player and other.Character then
-				local otherHRP = other.Character:FindFirstChild("HumanoidRootPart")
-				local humanoid = other.Character:FindFirstChildOfClass("Humanoid")
-				if otherHRP and humanoid and humanoid.Health > 0 then
-					local dist = (otherHRP.Position - myHRP.Position).Magnitude
-					if dist <= Config.BAT_RANGE then
+		-- Spatial query — exclude the attacker's own character from results
+		local overlapParams = OverlapParams.new()
+		overlapParams.FilterDescendantsInstances = { char }
+		overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+		local nearbyParts = workspace:GetPartBoundsInRadius(myHRP.Position, Config.BAT_RANGE, overlapParams)
+
+		-- ── 4a. PvP: check each nearby part for an enemy player character ─
+		local hitPlayers = {} -- guard against hitting the same player twice
+		for _, part in ipairs(nearbyParts) do
+			if hitConfirmed then
+				break
+			end
+			local otherChar = part.Parent
+			if otherChar then
+				local other = Players:GetPlayerFromCharacter(otherChar)
+				if other and other ~= player and not hitPlayers[other] then
+					local humanoid = otherChar:FindFirstChildOfClass("Humanoid")
+					if humanoid and humanoid.Health > 0 then
+						hitPlayers[other] = true
 						humanoid:TakeDamage(Config.BAT_DAMAGE)
 						RemoteEvents.HitFlash:FireClient(other)
 						RemoteEvents.BatHit:FireClient(player)
 						hitConfirmed = true
-						break
 					end
 				end
 			end
@@ -136,18 +146,19 @@ function BatCombat.init(remoteEvents, config)
 
 		-- ── 4b. Hunter NPC scan (Guard_ models) ──────────────────────────
 		if not hitConfirmed then
-			for _, model in ipairs(workspace:GetChildren()) do
-				if model:IsA("Model") and model.Name:sub(1, 6) == "Guard_" then
+			local hitModels = {}
+			for _, part in ipairs(nearbyParts) do
+				if hitConfirmed then
+					break
+				end
+				local model = part.Parent
+				if model and model:IsA("Model") and model.Name:sub(1, 6) == "Guard_" and not hitModels[model] then
 					local npcHumanoid = model:FindFirstChildOfClass("Humanoid")
-					local npcRoot = model.PrimaryPart or model:FindFirstChild("Torso")
-					if npcRoot and npcHumanoid and npcHumanoid.Health > 0 then
-						local dist = (npcRoot.Position - myHRP.Position).Magnitude
-						if dist <= Config.BAT_RANGE then
-							npcHumanoid:TakeDamage(Config.BAT_DAMAGE)
-							RemoteEvents.BatHit:FireClient(player)
-							hitConfirmed = true
-							break
-						end
+					if npcHumanoid and npcHumanoid.Health > 0 then
+						hitModels[model] = true
+						npcHumanoid:TakeDamage(Config.BAT_DAMAGE)
+						RemoteEvents.BatHit:FireClient(player)
+						hitConfirmed = true
 					end
 				end
 			end

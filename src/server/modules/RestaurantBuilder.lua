@@ -1108,6 +1108,36 @@ local function buildRestaurantTrees(parent, Config)
 end
 
 -- -------------------------------------------------------------------------
+-- World-wide tree scatter — avoids hotel footprint and safe base area
+-- -------------------------------------------------------------------------
+local function buildWorldTrees(parent, Config)
+	local cx = Config.HOTEL_CENTER.X
+	local cz = Config.HOTEL_CENTER.Z
+	-- Hotel half-extents with a buffer
+	local hotelHalfX = Config.HOTEL_SIZE.X / 2 + 20
+	local hotelHalfZ = Config.HOTEL_SIZE.Z / 2 + 20
+	-- Safe base X starts at 450; keep trees away from it
+	local baseMinX = 430
+
+	local MAP_HALF = 450 -- place trees within this square
+
+	local rng = Random.new(12345) -- fixed seed for deterministic placement
+	local placed = 0
+	local attempts = 0
+	while placed < 40 and attempts < 500 do
+		attempts = attempts + 1
+		local tx = rng:NextNumber(-MAP_HALF, MAP_HALF)
+		local tz = rng:NextNumber(-MAP_HALF, MAP_HALF)
+		-- Skip hotel footprint and base area
+		local inHotel = math.abs(tx - cx) < hotelHalfX and math.abs(tz - cz) < hotelHalfZ
+		if not inHotel and tx <= baseMinX then
+			buildTree(parent, Vector3.new(tx, 0.5, tz))
+			placed = placed + 1
+		end
+	end
+end
+
+-- -------------------------------------------------------------------------
 -- Main build entry point
 -- -------------------------------------------------------------------------
 function RestaurantBuilder.build(Config)
@@ -1313,6 +1343,10 @@ function RestaurantBuilder.build(Config)
 	buildEntrancePath(hotel, Config)
 	buildRiver(hotel, Config)
 	buildHills(hotel, Config)
+
+	-- Trees: ring around hotel + scattered across the wider map
+	buildRestaurantTrees(hotel, Config)
+	buildWorldTrees(hotel, Config)
 
 	return hotel, floorFoodPositions
 end

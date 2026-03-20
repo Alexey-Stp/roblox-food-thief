@@ -17,7 +17,7 @@ local BatSwing = eventsFolder:WaitForChild("BatSwing")
 local activatedConn = nil
 
 -- -------------------------------------------------------------------------
--- Hook the Bat tool's Activated event
+-- Hook the Bat tool's Activated event (works on desktop click AND mobile tap)
 -- -------------------------------------------------------------------------
 local function hookBatTool(tool)
 	if tool.Name ~= "Bat" then
@@ -30,7 +30,34 @@ local function hookBatTool(tool)
 		activatedConn = nil
 	end
 
+	-- Load swing animation onto the character's humanoid
+	local animTrack = nil
+	local character = localPlayer.Character
+	if character then
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			local animator = humanoid:FindFirstChildOfClass("Animator")
+			if not animator then
+				animator = Instance.new("Animator")
+				animator.Parent = humanoid
+			end
+			local anim = Instance.new("Animation")
+			anim.AnimationId = "rbxassetid://522635514"
+			local ok, track = pcall(function()
+				return animator:LoadAnimation(anim)
+			end)
+			if ok and track then
+				animTrack = track
+			end
+		end
+	end
+
 	activatedConn = tool.Activated:Connect(function()
+		-- Play swing animation (stop first so rapid taps restart it cleanly)
+		if animTrack then
+			animTrack:Stop()
+			animTrack:Play()
+		end
 		-- Send the local HRP position as a hint; the server re-validates targets
 		-- independently and never trusts the client for target selection.
 		local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -42,6 +69,10 @@ local function hookBatTool(tool)
 		if activatedConn then
 			activatedConn:Disconnect()
 			activatedConn = nil
+		end
+		if animTrack then
+			animTrack:Stop()
+			animTrack = nil
 		end
 	end)
 end
