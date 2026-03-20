@@ -170,6 +170,12 @@ Config.BAT_DAMAGE = 20 -- HP removed per hit
 Config.BAT_RANGE = 10 -- studs; server spatial scan radius
 
 -- -------------------------------------------------------------------------
+-- Castle destructible parts (Doors / Walls inside a "Castle" model)
+-- -------------------------------------------------------------------------
+Config.CASTLE_PART_HEALTH = 100 -- default HP for Door / Wall parts
+Config.CASTLE_PART_DESTROY_DELAY = 2 -- seconds before a destroyed part is removed
+
+-- -------------------------------------------------------------------------
 -- Guard (hunter) NPCs — Floor 1 only
 -- -------------------------------------------------------------------------
 Config.GUARD_ALERT_RANGE = 60 -- studs: react to theft within this radius
@@ -199,5 +205,15 @@ Config.AIRPLANE_INTERVAL_MIN = 90 -- min seconds between airplane events
 Config.AIRPLANE_INTERVAL_MAX = 180 -- max seconds between airplane events
 Config.AIRPLANE_DROP_INTERVAL = 8 -- seconds between food drops during flight
 Config.AIRPLANE_FOOD_DESPAWN = 30 -- seconds before dropped food disappears
+
+-- -------------------------------------------------------------------------
+-- Sky Hotel Castle (sky-level platform with healing food + breakable castle)
+-- -------------------------------------------------------------------------
+Config.SKY_HOTEL_Y = 300 -- altitude of the platform base (studs)
+Config.SKY_HOTEL_CENTER = Vector3.new(0, 300, 200) -- world center of the sky hotel
+Config.SKY_HOTEL_FOOD_HEAL = { 20, 35, 50 } -- HP restored by the three food spots
+Config.SKY_HOTEL_FOOD_RESPAWN = 15 -- seconds before a consumed food reappears
+Config.SKY_HOTEL_CHEST_COOLDOWN = 30 -- seconds between chest opens per player
+Config.SKY_HOTEL_CHEST_REWARD = 50 -- money awarded when opening the chest
 
 return Config

@@ -1,6 +1,7 @@
 -- Hud.client.lua  (LocalScript in StarterPlayerScripts)
--- Displays a heads-up overlay showing the local player's Money, Walk Speed,
--- and Jump Power.  Updates every 0.5 seconds.
+-- Displays a compact heads-up overlay.
+-- • Money indicator — bottom-right corner (small, unobtrusive)
+-- • Speed / Jump panel — top-right corner (compact stats strip)
 
 local Players = game:GetService("Players")
 
@@ -16,53 +17,74 @@ screenGui.IgnoreGuiInset = false
 screenGui.DisplayOrder = 5
 screenGui.Parent = localPlayer.PlayerGui
 
--- Compact panel in the top-right corner
-local panel = Instance.new("Frame")
-panel.Name = "HudPanel"
-panel.Size = UDim2.new(0, 200, 0, 110)
-panel.Position = UDim2.new(1, -210, 0, 10)
-panel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-panel.BackgroundTransparency = 0.45
-panel.BorderSizePixel = 0
-panel.Parent = screenGui
+-- ── Money panel — bottom-right ───────────────────────────────────────────
+local moneyPanel = Instance.new("Frame")
+moneyPanel.Name = "MoneyPanel"
+moneyPanel.Size = UDim2.new(0, 160, 0, 30)
+moneyPanel.Position = UDim2.new(1, -170, 1, -100)
+moneyPanel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+moneyPanel.BackgroundTransparency = 0.45
+moneyPanel.BorderSizePixel = 0
+moneyPanel.Parent = screenGui
 
--- Rounded corners
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = panel
+local moneyCorner = Instance.new("UICorner")
+moneyCorner.CornerRadius = UDim.new(0, 6)
+moneyCorner.Parent = moneyPanel
 
--- Padding
-local padding = Instance.new("UIPadding")
-padding.PaddingLeft = UDim.new(0, 8)
-padding.PaddingRight = UDim.new(0, 8)
-padding.PaddingTop = UDim.new(0, 6)
-padding.PaddingBottom = UDim.new(0, 6)
-padding.Parent = panel
+local moneyLabel = Instance.new("TextLabel")
+moneyLabel.Name = "MoneyLabel"
+moneyLabel.Size = UDim2.new(1, -8, 1, 0)
+moneyLabel.Position = UDim2.new(0, 8, 0, 0)
+moneyLabel.BackgroundTransparency = 1
+moneyLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+moneyLabel.TextScaled = true
+moneyLabel.TextXAlignment = Enum.TextXAlignment.Left
+moneyLabel.Font = Enum.Font.GothamBold
+moneyLabel.Text = "💰 $0"
+moneyLabel.Parent = moneyPanel
 
--- Auto-layout for the three rows
-local layout = Instance.new("UIListLayout")
-layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.Padding = UDim.new(0, 4)
-layout.Parent = panel
+-- ── Stats panel — top-right (speed & jump) ──────────────────────────────
+local statsPanel = Instance.new("Frame")
+statsPanel.Name = "StatsPanel"
+statsPanel.Size = UDim2.new(0, 150, 0, 52)
+statsPanel.Position = UDim2.new(1, -160, 0, 10)
+statsPanel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+statsPanel.BackgroundTransparency = 0.5
+statsPanel.BorderSizePixel = 0
+statsPanel.Parent = screenGui
 
--- Helper: create a single label row
-local function makeRow(order, icon, color)
+local statsCorner = Instance.new("UICorner")
+statsCorner.CornerRadius = UDim.new(0, 6)
+statsCorner.Parent = statsPanel
+
+local statsPadding = Instance.new("UIPadding")
+statsPadding.PaddingLeft = UDim.new(0, 6)
+statsPadding.PaddingRight = UDim.new(0, 6)
+statsPadding.PaddingTop = UDim.new(0, 4)
+statsPadding.PaddingBottom = UDim.new(0, 4)
+statsPadding.Parent = statsPanel
+
+local statsLayout = Instance.new("UIListLayout")
+statsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+statsLayout.Padding = UDim.new(0, 2)
+statsLayout.Parent = statsPanel
+
+local function makeStatRow(order, icon, color)
 	local lbl = Instance.new("TextLabel")
 	lbl.LayoutOrder = order
-	lbl.Size = UDim2.new(1, 0, 0, 28)
+	lbl.Size = UDim2.new(1, 0, 0, 20)
 	lbl.BackgroundTransparency = 1
 	lbl.TextColor3 = color
 	lbl.TextScaled = true
 	lbl.TextXAlignment = Enum.TextXAlignment.Left
 	lbl.Font = Enum.Font.GothamBold
 	lbl.Text = icon .. "  ..."
-	lbl.Parent = panel
+	lbl.Parent = statsPanel
 	return lbl
 end
 
-local moneyLabel = makeRow(1, "💰 Money:", Color3.fromRGB(255, 215, 0))
-local speedLabel = makeRow(2, "⚡ Speed:", Color3.fromRGB(100, 220, 255))
-local jumpLabel = makeRow(3, "🦘 Jump:", Color3.fromRGB(180, 255, 130))
+local speedLabel = makeStatRow(1, "⚡ Speed:", Color3.fromRGB(100, 220, 255))
+local jumpLabel = makeStatRow(2, "🦘 Jump:", Color3.fromRGB(180, 255, 130))
 
 -- -------------------------------------------------------------------------
 -- Update loop
@@ -71,16 +93,16 @@ task.spawn(function()
 	while true do
 		local ls = localPlayer:FindFirstChild("leaderstats")
 		local money = ls and ls:FindFirstChild("Money")
-		moneyLabel.Text = "💰 Money:  $" .. (money and money.Value or 0)
+		moneyLabel.Text = "💰  $" .. (money and money.Value or 0)
 
 		local char = localPlayer.Character
 		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 		if humanoid then
-			speedLabel.Text = "⚡ Speed:   " .. math.floor(humanoid.WalkSpeed)
-			jumpLabel.Text = "🦘 Jump:    " .. math.floor(humanoid.JumpPower)
+			speedLabel.Text = "⚡ Spd:  " .. math.floor(humanoid.WalkSpeed)
+			jumpLabel.Text = "🦘 Jmp:  " .. math.floor(humanoid.JumpPower)
 		else
-			speedLabel.Text = "⚡ Speed:   —"
-			jumpLabel.Text = "🦘 Jump:    —"
+			speedLabel.Text = "⚡ Spd:  —"
+			jumpLabel.Text = "🦘 Jmp:  —"
 		end
 
 		task.wait(0.5)

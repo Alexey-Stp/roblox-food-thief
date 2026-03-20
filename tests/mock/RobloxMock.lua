@@ -164,6 +164,15 @@ function Instance.new(className)
         return nil
     end
 
+    -- FindFirstChildWhichIsA: equivalent to FindFirstChildOfClass for the mock
+    -- (no inheritance hierarchy — ClassName equality is sufficient for tests)
+    function inst:FindFirstChildWhichIsA(cls)
+        for _, c in ipairs(self._children) do
+            if c.ClassName == cls then return c end
+        end
+        return nil
+    end
+
     function inst:GetChildren()
         local copy = {}
         for i, c in ipairs(self._children) do copy[i] = c end
@@ -467,6 +476,12 @@ function workspace:FindFirstChildOfClass(cls)
     return nil
 end
 
+function workspace:GetChildren()
+    local copy = {}
+    for i, c in ipairs(self._children) do copy[i] = c end
+    return copy
+end
+
 function workspace:GetDescendants()
     local result = {}
     local function collect(obj)
@@ -494,8 +509,12 @@ task = {
     delay = function(_, fn, ...) if fn then fn(...) end end,
 }
 
--- tick() — Roblox global for timestamps; map to os.clock for tests
-tick = os.clock
+-- tick() — Roblox global for timestamps.
+-- Use os.time() (Unix epoch seconds, ~1.7 × 10⁹) rather than os.clock()
+-- (CPU seconds, typically < 1).  This matches Roblox's tick() semantics:
+-- a large baseline value means "first-ever swing / first-ever hit" cooldown
+-- checks always pass when no prior stamp is recorded.
+tick = os.time
 
 -- ---------------------------------------------------------------------------
 -- script — mock for modules that reference script.Parent at load time
