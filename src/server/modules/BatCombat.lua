@@ -2,6 +2,13 @@
 -- Gives every player a bat on spawn and validates PvP melee hits on the server.
 -- Design rationale: the client fires BatSwing when the tool activates; the server
 -- performs its own spatial scan so exploiters cannot fake targets or bypass cooldowns.
+--
+-- Damage targets (all server-validated):
+--   1. Other players (PvP)
+--   2. Hunter guard NPCs (Models whose name starts with "Guard_")
+--   3. Parts named "Door" or "Wall" inside any Model named "Castle"
+--      → health tracked via a "Health" attribute; at zero the part becomes
+--        transparent and non-collidable (destroyed after a 2-second delay).
 
 local Players = game:GetService("Players")
 local StarterPack = game:GetService("StarterPack")
@@ -107,6 +114,9 @@ function BatCombat.init(remoteEvents, config)
 			return
 		end
 
+		local hitConfirmed = false
+
+		-- ── 4a. PvP: scan other players ──────────────────────────────────
 		for _, other in ipairs(Players:GetPlayers()) do
 			if other ~= player and other.Character then
 				local otherHRP = other.Character:FindFirstChild("HumanoidRootPart")
@@ -115,11 +125,64 @@ function BatCombat.init(remoteEvents, config)
 					local dist = (otherHRP.Position - myHRP.Position).Magnitude
 					if dist <= Config.BAT_RANGE then
 						humanoid:TakeDamage(Config.BAT_DAMAGE)
-						-- Red flash for the player who was hit
 						RemoteEvents.HitFlash:FireClient(other)
-						-- Hit-confirm sound for the attacker
 						RemoteEvents.BatHit:FireClient(player)
-						break -- only the nearest valid target is hit per swing
+						hitConfirmed = true
+						break
+					end
+				end
+			end
+		end
+
+		-- ── 4b. Hunter NPC scan (Guard_ models) ──────────────────────────
+		if not hitConfirmed then
+			for _, model in ipairs(workspace:GetChildren()) do
+				if model:IsA("Model") and model.Name:sub(1, 6) == "Guard_" then
+					local npcHumanoid = model:FindFirstChildOfClass("Humanoid")
+					local npcRoot = model.PrimaryPart or model:FindFirstChild("Torso")
+					if npcRoot and npcHumanoid and npcHumanoid.Health > 0 then
+						local dist = (npcRoot.Position - myHRP.Position).Magnitude
+						if dist <= Config.BAT_RANGE then
+							npcHumanoid:TakeDamage(Config.BAT_DAMAGE)
+							RemoteEvents.BatHit:FireClient(player)
+							hitConfirmed = true
+							break
+						end
+					end
+				end
+			end
+		end
+
+		-- ── 4c. Castle destructible parts (Door / Wall inside a "Castle" model) ─
+		if not hitConfirmed then
+			-- Search any Model named "Castle" anywhere in the workspace hierarchy
+			for _, obj in ipairs(workspace:GetDescendants()) do
+				if obj:IsA("Model") and obj.Name == "Castle" then
+					for _, part in ipairs(obj:GetDescendants()) do
+						if part:IsA("BasePart") and (part.Name == "Door" or part.Name == "Wall") then
+							local dist = (part.Position - myHRP.Position).Magnitude
+							if dist <= Config.BAT_RANGE then
+								local hp = (part:GetAttribute("Health") or Config.CASTLE_PART_HEALTH) - Config.BAT_DAMAGE
+								if hp <= 0 then
+									-- Part destroyed: make intangible, remove after a short delay
+									part.Transparency = 1
+									part.CanCollide = false
+									task.delay(Config.CASTLE_PART_DESTROY_DELAY, function()
+										if part and part.Parent then
+											part:Destroy()
+										end
+									end)
+								else
+									part:SetAttribute("Health", hp)
+								end
+								RemoteEvents.BatHit:FireClient(player)
+								hitConfirmed = true
+								break
+							end
+						end
+					end
+					if hitConfirmed then
+						break
 					end
 				end
 			end

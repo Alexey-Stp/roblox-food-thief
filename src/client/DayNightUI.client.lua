@@ -32,41 +32,41 @@ screenGui.IgnoreGuiInset = false
 screenGui.DisplayOrder = 6 -- above the PlayerHUD (DisplayOrder 5)
 screenGui.Parent = localPlayer.PlayerGui
 
--- Main panel — top-center of the screen
+-- Main panel — top-left of the screen (compact)
 local panel = Instance.new("Frame")
 panel.Name = "ClockPanel"
-panel.Size = UDim2.new(0, 240, 0, 100)
-panel.Position = UDim2.new(0.5, -120, 0, 8)
+panel.Size = UDim2.new(0, 170, 0, 72)
+panel.Position = UDim2.new(0, 8, 0, 8)
 panel.BackgroundColor3 = Color3.fromRGB(30, 80, 160)
 panel.BackgroundTransparency = 0.3
 panel.BorderSizePixel = 0
 panel.Parent = screenGui
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
+corner.CornerRadius = UDim.new(0, 8)
 corner.Parent = panel
 
 local padding = Instance.new("UIPadding")
-padding.PaddingLeft = UDim.new(0, 10)
-padding.PaddingRight = UDim.new(0, 10)
-padding.PaddingTop = UDim.new(0, 6)
-padding.PaddingBottom = UDim.new(0, 6)
+padding.PaddingLeft = UDim.new(0, 8)
+padding.PaddingRight = UDim.new(0, 8)
+padding.PaddingTop = UDim.new(0, 4)
+padding.PaddingBottom = UDim.new(0, 4)
 padding.Parent = panel
 
 local layout = Instance.new("UIListLayout")
 layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.Padding = UDim.new(0, 3)
+layout.Padding = UDim.new(0, 2)
 layout.Parent = panel
 
 -- Row 1: current time  (e.g. "🕐 3:45 PM")
 local timeLabel = Instance.new("TextLabel")
 timeLabel.Name = "TimeLabel"
 timeLabel.LayoutOrder = 1
-timeLabel.Size = UDim2.new(1, 0, 0, 32)
+timeLabel.Size = UDim2.new(1, 0, 0, 22)
 timeLabel.BackgroundTransparency = 1
 timeLabel.TextColor3 = Color3.fromRGB(255, 255, 220)
 timeLabel.TextScaled = true
-timeLabel.TextXAlignment = Enum.TextXAlignment.Center
+timeLabel.TextXAlignment = Enum.TextXAlignment.Left
 timeLabel.Font = Enum.Font.GothamBold
 timeLabel.Text = "🕐 Loading..."
 timeLabel.Parent = panel
@@ -75,11 +75,11 @@ timeLabel.Parent = panel
 local phaseLabel = Instance.new("TextLabel")
 phaseLabel.Name = "PhaseLabel"
 phaseLabel.LayoutOrder = 2
-phaseLabel.Size = UDim2.new(1, 0, 0, 22)
+phaseLabel.Size = UDim2.new(1, 0, 0, 18)
 phaseLabel.BackgroundTransparency = 1
 phaseLabel.TextColor3 = Color3.fromRGB(200, 230, 255)
 phaseLabel.TextScaled = true
-phaseLabel.TextXAlignment = Enum.TextXAlignment.Center
+phaseLabel.TextXAlignment = Enum.TextXAlignment.Left
 phaseLabel.Font = Enum.Font.Gotham
 phaseLabel.Text = ""
 phaseLabel.Parent = panel
@@ -88,11 +88,11 @@ phaseLabel.Parent = panel
 local countdownLabel = Instance.new("TextLabel")
 countdownLabel.Name = "CountdownLabel"
 countdownLabel.LayoutOrder = 3
-countdownLabel.Size = UDim2.new(1, 0, 0, 22)
+countdownLabel.Size = UDim2.new(1, 0, 0, 16)
 countdownLabel.BackgroundTransparency = 1
 countdownLabel.TextColor3 = Color3.fromRGB(255, 220, 130)
 countdownLabel.TextScaled = true
-countdownLabel.TextXAlignment = Enum.TextXAlignment.Center
+countdownLabel.TextXAlignment = Enum.TextXAlignment.Left
 countdownLabel.Font = Enum.Font.Gotham
 countdownLabel.Text = ""
 countdownLabel.Parent = panel

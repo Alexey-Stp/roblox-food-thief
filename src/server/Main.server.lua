@@ -27,6 +27,7 @@ local RefrigeratorSystem = safeRequire(modules.RefrigeratorSystem, "Refrigerator
 local FlyingCarpet = safeRequire(modules.FlyingCarpet, "FlyingCarpet")
 local AirplaneSystem = safeRequire(modules.AirplaneSystem, "AirplaneSystem")
 local HunterAI = safeRequire(modules.HunterAI, "HunterAI")
+local SkyHotel = safeRequire(modules.SkyHotel, "SkyHotel")
 
 -- 1. Init scoring and DataStore first (players may have already joined)
 GameSystems.init(Config)
@@ -41,6 +42,7 @@ RefrigeratorSystem.init(RemoteEvents, Config, GameSystems)
 FlyingCarpet.init(RemoteEvents, Config)
 AirplaneSystem.init(Config, GameSystems)
 HunterAI.init(RemoteEvents, Config)
+SkyHotel.init(Config)
 
 -- 3. Build the world
 print("[Main] Building Grand Hotel...")
@@ -48,6 +50,9 @@ local _, floorFoodPositions = RestaurantBuilder.build(Config)
 
 print("[Main] Building player safe base...")
 BaseBuilder.build()
+
+print("[Main] Building Sky Hotel Castle...")
+SkyHotel.build()
 
 print("[Main] Spawning food on tables...")
 task.wait(0.5)
