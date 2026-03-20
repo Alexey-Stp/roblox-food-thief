@@ -193,8 +193,10 @@ local function loadPlayer(player)
 
 			-- Restore WalkSpeed / JumpPower; ensure saved values never go below the
 			-- current default (old saves may have stored the pre-update 16/50 values)
-			playerSettings[player.UserId].walkSpeed = math.max(data.walkSpeed or Config.DEFAULT_WALK_SPEED, Config.DEFAULT_WALK_SPEED)
-			playerSettings[player.UserId].jumpPower = math.max(data.jumpPower or Config.DEFAULT_JUMP_POWER, Config.DEFAULT_JUMP_POWER)
+			playerSettings[player.UserId].walkSpeed =
+				math.max(data.walkSpeed or Config.DEFAULT_WALK_SPEED, Config.DEFAULT_WALK_SPEED)
+			playerSettings[player.UserId].jumpPower =
+				math.max(data.jumpPower or Config.DEFAULT_JUMP_POWER, Config.DEFAULT_JUMP_POWER)
 
 			-- Restore collectedFood set from the saved list
 			if type(data.collectedFood) == "table" then

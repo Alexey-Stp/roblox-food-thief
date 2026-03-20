@@ -494,6 +494,30 @@ function workspace:GetDescendants()
     return result
 end
 
+-- GetPartBoundsInRadius — returns all Part/WedgePart descendants within radius studs.
+-- Filter params are intentionally ignored; tests control workspace content directly.
+function workspace:GetPartBoundsInRadius(center, radius, _params)
+    local result = {}
+    local function collect(obj)
+        if not obj._children then
+            return
+        end
+        for _, c in ipairs(obj._children) do
+            if (c.ClassName == "Part" or c.ClassName == "WedgePart") and c.Position then
+                local dx = c.Position.X - center.X
+                local dy = c.Position.Y - center.Y
+                local dz = c.Position.Z - center.Z
+                if dx * dx + dy * dy + dz * dz <= radius * radius then
+                    table.insert(result, c)
+                end
+            end
+            collect(c)
+        end
+    end
+    collect(self)
+    return result
+end
+
 function _G.resetWorkspace()
     workspace._children = {}
 end
@@ -572,6 +596,29 @@ end
 -- math.huge, math.rad, math.sqrt — already standard Lua
 -- os.clock, os.time — already standard Lua
 -- ipairs, pairs, type, tostring, table, string — all standard Lua
+
+-- OverlapParams — used by workspace:GetPartBoundsInRadius in production code
+OverlapParams = { new = function()
+    return { FilterDescendantsInstances = {}, FilterType = "" }
+end }
+
+-- RaycastParams — used by server-side weapon raycast in ChestSystem
+RaycastParams = { new = function()
+    return { FilterDescendantsInstances = {}, FilterType = "" }
+end }
+
+-- Random — Roblox seeded RNG class (used by RestaurantBuilder tree scatter)
+Random = {}
+Random.__index = Random
+function Random.new(_seed)
+    return setmetatable({}, Random)
+end
+function Random:NextNumber(min, max)
+    return (min or 0) + math.random() * ((max or 1) - (min or 0))
+end
+function Random:NextInteger(min, max)
+    return math.random(min or 0, max or 1)
+end
 
 -- table.clone — Roblox extension; polyfill for LuaJIT / Lua 5.1
 if not table.clone then

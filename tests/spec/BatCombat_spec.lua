@@ -110,6 +110,12 @@ local function makeVictim(name, position)
 		Name = (name or "Victim") .. "Character",
 		_children = { hrp, humanoid },
 	}
+
+	-- Link hrp back to its parent so GetPartBoundsInRadius → part.Parent works correctly.
+	-- Manually set _parent (bypasses the Instance metamethod since character is a plain table).
+	rawset(hrp, "_parent", character)
+	-- Place the character in workspace so the spatial query can discover the HRP.
+	table.insert(workspace._children, character)
 	function character:FindFirstChild(n)
 		for _, c in ipairs(self._children) do
 			if c.Name == n then

@@ -22,19 +22,19 @@ local CarpetPositionUpdate = eventsFolder:WaitForChild("CarpetPositionUpdate")
 local CarpetRevoked = eventsFolder:WaitForChild("CarpetRevoked")
 local CarpetSpawned = eventsFolder:WaitForChild("CarpetSpawned")
 
-local FLIGHT_SPEED  = 60 -- horizontal studs/sec (matches Config.CARPET_FLIGHT_SPEED)
-local ASCENT_SPEED  = 15 -- vertical studs/sec   (matches Config.CARPET_ASCENT_SPEED)
-local DESCENT_SPEED = 8  -- gentle fall when pressing Shift
+local FLIGHT_SPEED = 60 -- horizontal studs/sec (matches Config.CARPET_FLIGHT_SPEED)
+local ASCENT_SPEED = 15 -- vertical studs/sec   (matches Config.CARPET_ASCENT_SPEED)
+local DESCENT_SPEED = 8 -- gentle fall when pressing Shift
 
 -- -------------------------------------------------------------------------
 -- Active flight state
 -- -------------------------------------------------------------------------
-local flightConnection    = nil
-local flightAttachment    = nil
-local flightLinearVel     = nil
-local flightAlignOrient   = nil
-local reportTimer         = 0
-local REPORT_INTERVAL     = 0.1 -- seconds between server position reports
+local flightConnection = nil
+local flightAttachment = nil
+local flightLinearVel = nil
+local flightAlignOrient = nil
+local reportTimer = 0
+local REPORT_INTERVAL = 0.1 -- seconds between server position reports
 
 -- -------------------------------------------------------------------------
 -- Start / stop flight using constraint-based physics
@@ -44,7 +44,7 @@ local function startFlight(character)
 		return
 	end -- already flying
 
-	local hrp      = character:WaitForChild("HumanoidRootPart")
+	local hrp = character:WaitForChild("HumanoidRootPart")
 	local humanoid = character:WaitForChild("Humanoid")
 
 	humanoid.PlatformStand = false
@@ -80,9 +80,9 @@ local function startFlight(character)
 		end
 
 		-- Camera-relative horizontal direction
-		local cam     = workspace.CurrentCamera
+		local cam = workspace.CurrentCamera
 		local forward = Vector3.new(cam.CFrame.LookVector.X, 0, cam.CFrame.LookVector.Z)
-		local right   = Vector3.new(cam.CFrame.RightVector.X, 0, cam.CFrame.RightVector.Z)
+		local right = Vector3.new(cam.CFrame.RightVector.X, 0, cam.CFrame.RightVector.Z)
 
 		if forward.Magnitude > 0 then
 			forward = forward.Unit

@@ -36,25 +36,59 @@ local function buildDog(pos, parent)
 	model.Name = "AmbientDog"
 	model.Parent = parent
 
-	local body = makePart("Body", Vector3.new(1.8, 1, 2.5), pos + Vector3.new(0, 0.5, 0), "Sand red", Enum.Material.SmoothPlastic, model)
+	local body = makePart(
+		"Body",
+		Vector3.new(1.8, 1, 2.5),
+		pos + Vector3.new(0, 0.5, 0),
+		"Sand red",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	body.Anchored = false
 	model.PrimaryPart = body
 
-	local head = makePart("Head", Vector3.new(1, 0.9, 1), pos + Vector3.new(0, 1.2, 1), "Sand red", Enum.Material.SmoothPlastic, model)
+	local head = makePart(
+		"Head",
+		Vector3.new(1, 0.9, 1),
+		pos + Vector3.new(0, 1.2, 1),
+		"Sand red",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	head.Anchored = false
 	weld(body, head)
 
-	local snout = makePart("Snout", Vector3.new(0.5, 0.4, 0.5), pos + Vector3.new(0, 1.0, 1.5), "Nougat", Enum.Material.SmoothPlastic, model)
+	local snout = makePart(
+		"Snout",
+		Vector3.new(0.5, 0.4, 0.5),
+		pos + Vector3.new(0, 1.0, 1.5),
+		"Nougat",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	snout.Anchored = false
 	weld(body, snout)
 
-	local tail = makePart("Tail", Vector3.new(0.3, 0.3, 1), pos + Vector3.new(0, 0.8, -1.5), "Sand red", Enum.Material.SmoothPlastic, model)
+	local tail = makePart(
+		"Tail",
+		Vector3.new(0.3, 0.3, 1),
+		pos + Vector3.new(0, 0.8, -1.5),
+		"Sand red",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	tail.Anchored = false
 	weld(body, tail)
 
 	-- Four legs
-	for _, offset in ipairs({ Vector3.new(0.6, -0.75, 0.8), Vector3.new(-0.6, -0.75, 0.8), Vector3.new(0.6, -0.75, -0.8), Vector3.new(-0.6, -0.75, -0.8) }) do
-		local leg = makePart("Leg", Vector3.new(0.35, 0.9, 0.35), pos + offset, "Sand red", Enum.Material.SmoothPlastic, model)
+	for _, offset in ipairs({
+		Vector3.new(0.6, -0.75, 0.8),
+		Vector3.new(-0.6, -0.75, 0.8),
+		Vector3.new(0.6, -0.75, -0.8),
+		Vector3.new(-0.6, -0.75, -0.8),
+	}) do
+		local leg =
+			makePart("Leg", Vector3.new(0.35, 0.9, 0.35), pos + offset, "Sand red", Enum.Material.SmoothPlastic, model)
 		leg.Anchored = false
 		weld(body, leg)
 	end
@@ -76,27 +110,68 @@ local function buildCat(pos, parent)
 	model.Name = "AmbientCat"
 	model.Parent = parent
 
-	local body = makePart("Body", Vector3.new(1.2, 0.7, 1.8), pos + Vector3.new(0, 0.35, 0), "Tan", Enum.Material.SmoothPlastic, model)
+	local body = makePart(
+		"Body",
+		Vector3.new(1.2, 0.7, 1.8),
+		pos + Vector3.new(0, 0.35, 0),
+		"Tan",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	body.Anchored = false
 	model.PrimaryPart = body
 
-	local head = makePart("Head", Vector3.new(0.8, 0.7, 0.8), pos + Vector3.new(0, 0.9, 0.7), "Tan", Enum.Material.SmoothPlastic, model)
+	local head = makePart(
+		"Head",
+		Vector3.new(0.8, 0.7, 0.8),
+		pos + Vector3.new(0, 0.9, 0.7),
+		"Tan",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	head.Anchored = false
 	weld(body, head)
 
-	local earL = makePart("EarL", Vector3.new(0.2, 0.3, 0.1), pos + Vector3.new(0.25, 1.3, 0.7), "Tan", Enum.Material.SmoothPlastic, model)
+	local earL = makePart(
+		"EarL",
+		Vector3.new(0.2, 0.3, 0.1),
+		pos + Vector3.new(0.25, 1.3, 0.7),
+		"Tan",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	earL.Anchored = false
 	weld(body, earL)
-	local earR = makePart("EarR", Vector3.new(0.2, 0.3, 0.1), pos + Vector3.new(-0.25, 1.3, 0.7), "Tan", Enum.Material.SmoothPlastic, model)
+	local earR = makePart(
+		"EarR",
+		Vector3.new(0.2, 0.3, 0.1),
+		pos + Vector3.new(-0.25, 1.3, 0.7),
+		"Tan",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	earR.Anchored = false
 	weld(body, earR)
 
-	local tail = makePart("Tail", Vector3.new(0.2, 0.2, 1.2), pos + Vector3.new(0, 0.5, -1.2), "Tan", Enum.Material.SmoothPlastic, model)
+	local tail = makePart(
+		"Tail",
+		Vector3.new(0.2, 0.2, 1.2),
+		pos + Vector3.new(0, 0.5, -1.2),
+		"Tan",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	tail.Anchored = false
 	weld(body, tail)
 
-	for _, offset in ipairs({ Vector3.new(0.4, -0.5, 0.55), Vector3.new(-0.4, -0.5, 0.55), Vector3.new(0.4, -0.5, -0.55), Vector3.new(-0.4, -0.5, -0.55) }) do
-		local leg = makePart("Leg", Vector3.new(0.25, 0.6, 0.25), pos + offset, "Tan", Enum.Material.SmoothPlastic, model)
+	for _, offset in ipairs({
+		Vector3.new(0.4, -0.5, 0.55),
+		Vector3.new(-0.4, -0.5, 0.55),
+		Vector3.new(0.4, -0.5, -0.55),
+		Vector3.new(-0.4, -0.5, -0.55),
+	}) do
+		local leg =
+			makePart("Leg", Vector3.new(0.25, 0.6, 0.25), pos + offset, "Tan", Enum.Material.SmoothPlastic, model)
 		leg.Anchored = false
 		weld(body, leg)
 	end
@@ -118,12 +193,33 @@ local function buildBird(centerPos, altitude, parent)
 	model.Name = "AmbientBird"
 	model.Parent = parent
 
-	local body = makePart("Body", Vector3.new(0.6, 0.3, 0.9), centerPos + Vector3.new(0, altitude, 0), "White", Enum.Material.SmoothPlastic, model)
+	local body = makePart(
+		"Body",
+		Vector3.new(0.6, 0.3, 0.9),
+		centerPos + Vector3.new(0, altitude, 0),
+		"White",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	body.Anchored = true
 
-	local wingL = makePart("WingL", Vector3.new(0.9, 0.1, 0.4), body.Position + Vector3.new(0.75, 0, 0), "White", Enum.Material.SmoothPlastic, model)
+	local wingL = makePart(
+		"WingL",
+		Vector3.new(0.9, 0.1, 0.4),
+		body.Position + Vector3.new(0.75, 0, 0),
+		"White",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	wingL.Anchored = true
-	local wingR = makePart("WingR", Vector3.new(0.9, 0.1, 0.4), body.Position + Vector3.new(-0.75, 0, 0), "White", Enum.Material.SmoothPlastic, model)
+	local wingR = makePart(
+		"WingR",
+		Vector3.new(0.9, 0.1, 0.4),
+		body.Position + Vector3.new(-0.75, 0, 0),
+		"White",
+		Enum.Material.SmoothPlastic,
+		model
+	)
 	wingR.Anchored = true
 
 	return model, body, wingL, wingR, centerPos, altitude

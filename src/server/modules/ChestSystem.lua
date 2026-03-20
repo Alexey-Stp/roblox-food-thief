@@ -21,9 +21,9 @@ local CHEST_RESPAWN_TIME = 60 -- seconds
 -- Weighted loot table
 local LOOT_TABLE = {
 	{ name = "HealingFood", weight = 50 },
-	{ name = "Pistol",      weight = 25 },
-	{ name = "Rifle",       weight = 20 },
-	{ name = "MagicCarpet", weight = 5  },
+	{ name = "Pistol", weight = 25 },
+	{ name = "Rifle", weight = 20 },
+	{ name = "MagicCarpet", weight = 5 },
 }
 
 -- Pre-compute total weight
@@ -36,8 +36,8 @@ end
 local weaponCooldowns = {}
 
 local WEAPON_COOLDOWN = { Pistol = 1, Rifle = 2 }
-local WEAPON_DAMAGE   = { Pistol = 15, Rifle = 30 }
-local WEAPON_RANGE    = { Pistol = 60, Rifle = 120 }
+local WEAPON_DAMAGE = { Pistol = 15, Rifle = 30 }
+local WEAPON_RANGE = { Pistol = 60, Rifle = 120 }
 
 -- -------------------------------------------------------------------------
 -- Weighted random roll
@@ -147,15 +147,12 @@ local function giveLoot(player, lootName)
 		if humanoid and humanoid.Health > 0 then
 			humanoid.Health = math.min(humanoid.Health + 50, humanoid.MaxHealth)
 		end
-
 	elseif lootName == "Pistol" then
 		local tool = buildPistol()
 		tool.Parent = player.Backpack
-
 	elseif lootName == "Rifle" then
 		local tool = buildRifle()
 		tool.Parent = player.Backpack
-
 	elseif lootName == "MagicCarpet" then
 		-- Only give if the player doesn't already have one
 		if not player.Backpack:FindFirstChild("FlyingCarpet") then
