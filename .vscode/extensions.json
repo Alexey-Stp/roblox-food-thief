@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    // Rojo — file-system sync between VS Code and Roblox Studio
+    "evaera.vscode-rojo",
+    // Luau Language Server — autocomplete, type checking, diagnostics for Roblox Luau
+    "johnnymorganz.luau-lsp",
+    // Selene — Lua/Luau linter
+    "Kampfkarren.selene-vscode",
+    // StyLua — opinionated Lua/Luau code formatter
+    "JohnnyMorganz.stylua",
+    // Generic Lua support (fallback syntax highlighting)
+    "sumneko.lua"
+  ]
+}

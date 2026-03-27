@@ -70,10 +70,12 @@ Config.SHOP_SPEED_COST = 100 -- money to buy one speed boost
 Config.SHOP_JUMP_COST = 150 -- money to buy one jump boost
 Config.SPEED_BOOST = 8 -- WalkSpeed added per purchase
 Config.JUMP_BOOST = 15 -- JumpPower added per purchase
+Config.MAX_WALK_SPEED = 500 -- hard cap on WalkSpeed
+Config.MAX_JUMP_POWER = 500 -- hard cap on JumpPower
 
 -- Default starting movement values (applied on every spawn)
-Config.DEFAULT_WALK_SPEED = 500
-Config.DEFAULT_JUMP_POWER = 500
+Config.DEFAULT_WALK_SPEED = 16
+Config.DEFAULT_JUMP_POWER = 50
 
 -- -------------------------------------------------------------------------
 -- Prize box

@@ -4,7 +4,7 @@
         {
             "label": "Rojo: Serve",
             "type": "shell",
-            "command": "${workspaceFolder}\\rojo.exe",
+            "command": "rojo",
             "args": [
                 "serve",
                 "default.project.json"
@@ -27,7 +27,7 @@
         {
             "label": "Rojo: Build",
             "type": "shell",
-            "command": "${workspaceFolder}\\rojo.exe",
+            "command": "rojo",
             "args": [
                 "build",
                 "default.project.json",
@@ -51,7 +51,7 @@
         {
             "label": "Rojo: Build (rbxlx)",
             "type": "shell",
-            "command": "${workspaceFolder}\\rojo.exe",
+            "command": "rojo",
             "args": [
                 "build",
                 "default.project.json",
@@ -72,7 +72,7 @@
         {
             "label": "Rojo: Init",
             "type": "shell",
-            "command": "${workspaceFolder}\\rojo.exe",
+            "command": "rojo",
             "args": [
                 "init"
             ],

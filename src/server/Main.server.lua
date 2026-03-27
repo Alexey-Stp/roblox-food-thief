@@ -30,6 +30,7 @@ local HunterAI = safeRequire(modules.HunterAI, "HunterAI")
 local SkyHotel = safeRequire(modules.SkyHotel, "SkyHotel")
 local AmbientCreatures = safeRequire(modules.AmbientCreatures, "AmbientCreatures")
 local ChestSystem = safeRequire(modules.ChestSystem, "ChestSystem")
+local WorldPopulation = safeRequire(modules.WorldPopulation, "WorldPopulation")
 
 -- 1. Init scoring and DataStore first (players may have already joined)
 GameSystems.init(Config)
@@ -47,6 +48,7 @@ HunterAI.init(RemoteEvents, Config)
 SkyHotel.init(Config)
 AmbientCreatures.init()
 ChestSystem.init(RemoteEvents, Config)
+WorldPopulation.init(Config, EnemyAI)
 
 -- 3. Build the world
 print("[Main] Building Grand Hotel...")
@@ -93,6 +95,9 @@ AmbientCreatures.spawnAll()
 
 print("[Main] Spawning loot chests...")
 ChestSystem.spawnAll()
+
+print("[Main] Populating world buildings and open map...")
+task.spawn(WorldPopulation.populate)
 
 print("[Main] Game ready!")
 

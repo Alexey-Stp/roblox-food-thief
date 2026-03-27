@@ -213,7 +213,7 @@ local function buildShop(baseModel, basePosition)
 		"Buy Speed Boost",
 		Config.SHOP_SPEED_COST,
 		function(h)
-			h.WalkSpeed = math.min(h.WalkSpeed + Config.SPEED_BOOST, 40)
+			h.WalkSpeed = math.min(h.WalkSpeed + Config.SPEED_BOOST, Config.MAX_WALK_SPEED)
 		end
 	)
 
@@ -224,7 +224,7 @@ local function buildShop(baseModel, basePosition)
 		"Buy Jump Boost",
 		Config.SHOP_JUMP_COST,
 		function(h)
-			h.JumpPower = math.min(h.JumpPower + Config.JUMP_BOOST, 100)
+			h.JumpPower = math.min(h.JumpPower + Config.JUMP_BOOST, Config.MAX_JUMP_POWER)
 		end
 	)
 end
