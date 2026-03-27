@@ -27,9 +27,9 @@ Config.TABLES_PER_FLOOR = { 8, 6, 4 }
 -- Enemy behaviour — per level [1]=wolves [2]=bears [3]=occultists
 -- -------------------------------------------------------------------------
 Config.LEVEL_SPEEDS = {
-	{ chase = 12, wander = 7 }, -- Floor 1: Wolves
-	{ chase = 18, wander = 12 }, -- Floor 2: Bears
-	{ chase = 28, wander = 18 }, -- Floor 3: Occultists
+	{ chase = 16, wander = 9 }, -- Floor 1: Wolves
+	{ chase = 24, wander = 15 }, -- Floor 2: Bears
+	{ chase = 36, wander = 22 }, -- Floor 3: Occultists
 }
 Config.CREATURES_PER_LEVEL = 3
 Config.DETECTION_RANGE = 80 -- studs; food-carrier detection radius
@@ -185,9 +185,9 @@ Config.CASTLE_PART_DESTROY_DELAY = 2 -- seconds before a destroyed part is remov
 -- Guard (hunter) NPCs — Floor 1 only
 -- -------------------------------------------------------------------------
 Config.GUARD_ALERT_RANGE = 60 -- studs: react to theft within this radius
-Config.GUARD_CATCH_RANGE = 5 -- studs: triggers catch sequence
-Config.GUARD_CHASE_SPEED = 14 -- WalkSpeed while chasing
-Config.GUARD_PATROL_SPEED = 6 -- WalkSpeed while patrolling
+Config.GUARD_CATCH_RANGE = 9 -- studs: triggers catch sequence
+Config.GUARD_CHASE_SPEED = 20 -- WalkSpeed while chasing
+Config.GUARD_PATROL_SPEED = 8 -- WalkSpeed while patrolling
 Config.GUARD_CHASE_TIMEOUT = 20 -- seconds before guard abandons chase
 Config.GUARD_COUNT = 3 -- number of guards spawned on floor 1
 

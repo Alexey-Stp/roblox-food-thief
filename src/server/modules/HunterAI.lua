@@ -188,11 +188,11 @@ end
 -- -------------------------------------------------------------------------
 local function chaseStep(humanoid, fromPos, toPos)
 	local path = PathfindingService:CreatePath({
-		AgentRadius = 2,
+		AgentRadius = 1.5,
 		AgentHeight = 5,
 		AgentCanJump = false,
 		AgentCanClimb = false,
-		WaypointSpacing = 4,
+		WaypointSpacing = 2,
 	})
 
 	local ok = pcall(function()
@@ -235,7 +235,7 @@ local function startAI(model, torso, humanoid)
 
 	task.spawn(function()
 		while alive do
-			task.wait(0.5)
+			task.wait(0.3)
 			if not (model.Parent and humanoid) then
 				break
 			end

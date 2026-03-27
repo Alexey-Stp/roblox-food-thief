@@ -56,6 +56,20 @@ local BUILDING_ENEMIES = {
 }
 
 -- -------------------------------------------------------------------------
+-- Enemies to spawn at NPC / monster model positions
+-- -------------------------------------------------------------------------
+local NPC_ENEMIES = {
+	["NPC"] = {
+		{ name = "ZombiePatrol1", offset = Vector3.new(0, 5, 0), level = 2 },
+		{ name = "ZombiePatrol2", offset = Vector3.new(20, 5, 20), level = 1 },
+	},
+	["Ram Monster"] = {
+		{ name = "RamStalker1", offset = Vector3.new(0, 5, 0), level = 3 },
+		{ name = "RamStalker2", offset = Vector3.new(30, 5, 0), level = 2 },
+	},
+}
+
+-- -------------------------------------------------------------------------
 -- Open-map roaming enemies (patrol the area between buildings)
 -- -------------------------------------------------------------------------
 local MAP_ENEMIES = {
@@ -118,6 +132,18 @@ function WorldPopulation.populate()
 			local spawnPos = basePos + def.offset
 			task.spawn(function()
 				EnemyAI.spawn(def.name, spawnPos, Config, def.level)
+			end)
+		end
+	end
+
+	-- Spawn enemies at NPC / monster model positions
+	for npcName, enemies in pairs(NPC_ENEMIES) do
+		local anchor = NPC_ANCHORS[npcName]
+		local model = workspace:FindFirstChild(npcName)
+		local basePos = model and model:GetPivot().Position or anchor
+		for _, def in ipairs(enemies) do
+			task.spawn(function()
+				EnemyAI.spawn(def.name, basePos + def.offset, Config, def.level)
 			end)
 		end
 	end
