@@ -16,7 +16,6 @@
 					<R21>0</R21>
 					<R22>1</R22>
 				</CoordinateFrame>
-				<SharedString name="ModelMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 				<Vector3 name="ModelMeshSize">
 					<X>0</X>
 					<Y>0</Y>
@@ -26,7 +25,6 @@
 				<bool name="NeedsPivotMigration">false</bool>
 				<Ref name="PrimaryPart">RBXd1f872f8f9654119a40c948cefff7a58</Ref>
 				<float name="ScaleFactor">3.96900344</float>
-				<SharedString name="SlimHash">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 				<OptionalCoordinateFrame name="WorldPivotData">
 					<CFrame>
 						<X>-14.6197805</X>
@@ -533,10 +531,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">0</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">true</bool>
-					<SharedString name="PhysicalConfigData">bJ3t3ZHjNHuieWOOL3/ffg==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>-0.00333284121</X>
 						<Y>0.238730088</Y>
@@ -668,8 +664,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=114783228827200</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>-5.96046448e-08</X>
 							<Y>-2.55461979</Y>
@@ -1390,10 +1384,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">172</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">XDiuEHd3SH+24GFp/4tdGw==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>-0.0210658237</X>
 						<Y>0.0391820073</Y>
@@ -1525,8 +1517,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=120463540938500</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>-1.04555178</X>
 							<Y>-0.924335837</Y>
@@ -1780,10 +1770,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">174</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">oYykWHd36ag8WJpv68A7Nw==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>-0.071948275</X>
 						<Y>0.0411159955</Y>
@@ -1915,8 +1903,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=96680216661401</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>-1.53832626</X>
 							<Y>-0.133925542</Y>
@@ -2126,10 +2112,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">358</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">MuaLb2jxoIeSV+VxksdNtQ==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>0.0757146329</X>
 						<Y>0.166928634</Y>
@@ -2261,8 +2245,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=97589411569592</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>-1.92688334</X>
 							<Y>0.672646642</Y>
@@ -2472,10 +2454,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">222</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">Ikmy5IpR5AwVeoxIhWB6Hw==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>0.0397222675</X>
 						<Y>0.0956588313</Y>
@@ -2607,8 +2587,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=130828379360305</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>-0.429577589</X>
 							<Y>0.642985761</Y>
@@ -2818,10 +2796,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">140</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">cNYrWrdlL90IxtH9WRRYag==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>-0.00172317808</X>
 						<Y>-0.00108196994</Y>
@@ -2953,8 +2929,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=107735870059715</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>-0.449131638</X>
 							<Y>1.5585165</Y>
@@ -3164,10 +3138,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">44</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">YfA6VDg0aFgMx9KVVSrqtQ==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>-0.00231910613</X>
 						<Y>-0.0245617386</Y>
@@ -3299,8 +3271,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=85501552968471</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>-0.519470572</X>
 							<Y>2.1112597</Y>
@@ -3510,10 +3480,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">222</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">rfZGCah+FD0af9a+P49OtA==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>-0.0397383012</X>
 						<Y>0.0956482515</Y>
@@ -3645,8 +3613,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=101076213218196</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>0.359367162</X>
 							<Y>0.630102634</Y>
@@ -3856,10 +3822,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">140</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">PujDVq/ixiuZkAmtPh9WRw==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>0.00168884697</X>
 						<Y>-0.00110796792</Y>
@@ -3991,8 +3955,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=93715115510242</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>0.456966162</X>
 							<Y>1.56090379</Y>
@@ -4202,10 +4164,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">44</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">xFpdTr59L1wDn3YCZxfwZQ==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>0.00146828988</X>
 						<Y>-0.0241152961</Y>
@@ -4337,8 +4297,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=136564816568647</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>0.517439246</X>
 							<Y>2.11080337</Y>
@@ -4548,10 +4506,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">357</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">teOC+vBqK4QTZNqMFbkn+A==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>-0.075656198</X>
 						<Y>0.166881606</Y>
@@ -4683,8 +4639,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=104858437135856</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>1.97645426</X>
 							<Y>0.655636728</Y>
@@ -4894,10 +4848,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">172</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">sX1L0ilwy6AesnB+cPiIvA==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>0.0211743303</X>
 						<Y>0.0391721427</Y>
@@ -5029,8 +4981,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=109534841992972</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>1.00061774</X>
 							<Y>-0.929340005</Y>
@@ -5284,10 +5234,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">174</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">PlRGH0RqgosbBVmfnnvoaw==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>0.0719184801</X>
 						<Y>0.0410890058</Y>
@@ -5419,8 +5367,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=101187990183436</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>1.5404681</X>
 							<Y>-0.165185571</Y>
@@ -5888,10 +5834,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">333</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">K+cIgfRT+yEHr0vTJN/FKg==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>-0.011838885</X>
 						<Y>0.154851213</Y>
@@ -6023,8 +5967,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=130322987709687</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>-0.00892964005</X>
 							<Y>-1.01370466</Y>
@@ -6542,10 +6484,8 @@
 					<token name="RenderFidelity">0</token>
 					<Content name="TextureID"><url>rbxassetid://95975481699562</url></Content>
 					<int name="VertexCount">126</int>
-					<SharedString name="AeroMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 					<token name="FluidFidelityInternal">0</token>
 					<bool name="InertiaMigrated">false</bool>
-					<SharedString name="PhysicalConfigData">ENwMB8os12COV9P6CHQ1TQ==</SharedString>
 					<Vector3 name="UnscaledCofm">
 						<X>1.84449764e-05</X>
 						<Y>0.0386512466</Y>
@@ -6677,8 +6617,6 @@
 							<R22>1</R22>
 						</CoordinateFrame>
 						<Content name="HSRAssetId"><url>https://www.roblox.com//asset/?id=137456541617863</url></Content>
-						<SharedString name="HSRData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
-						<SharedString name="HSRMeshIdData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 						<CoordinateFrame name="ImportOrigin">
 							<X>-0.0201058388</X>
 							<Y>-0.0913956016</Y>

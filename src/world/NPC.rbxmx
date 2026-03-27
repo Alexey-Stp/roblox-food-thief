@@ -16,7 +16,6 @@
 					<R21>0</R21>
 					<R22>1</R22>
 				</CoordinateFrame>
-				<SharedString name="ModelMeshData">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 				<Vector3 name="ModelMeshSize">
 					<X>0</X>
 					<Y>0</Y>
@@ -26,7 +25,6 @@
 				<bool name="NeedsPivotMigration">false</bool>
 				<Ref name="PrimaryPart">null</Ref>
 				<float name="ScaleFactor">1</float>
-				<SharedString name="SlimHash">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
 				<OptionalCoordinateFrame name="WorldPivotData">
 					<CFrame>
 						<X>0.341217041</X>
