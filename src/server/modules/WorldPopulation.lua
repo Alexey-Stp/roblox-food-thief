@@ -19,17 +19,17 @@ local EnemyAI = nil
 -- Where to move each imported building (pivot / origin point)
 -- -------------------------------------------------------------------------
 local BUILDING_ANCHORS = {
-	["McDonald's"]            = Vector3.new(-500, 1,    0),
-	["Dodo's pizza Restaurant"] = Vector3.new(   0, 1, -500),
-	["Model"]                 = Vector3.new(-500, 1, -500), -- castle/lights
+	["McDonald's"] = Vector3.new(-500, 1, 0),
+	["Dodo's pizza Restaurant"] = Vector3.new(0, 1, -500),
+	["Model"] = Vector3.new(-500, 1, -500), -- castle/lights
 }
 
 -- -------------------------------------------------------------------------
 -- Where to move the NPC / monster models from Studio
 -- -------------------------------------------------------------------------
 local NPC_ANCHORS = {
-	["NPC"]         = Vector3.new(-350, 1,  300),
-	["Ram Monster"] = Vector3.new( 300, 1, -350),
+	["NPC"] = Vector3.new(-350, 1, 300),
+	["Ram Monster"] = Vector3.new(300, 1, -350),
 }
 
 -- -------------------------------------------------------------------------
@@ -38,20 +38,20 @@ local NPC_ANCHORS = {
 -- -------------------------------------------------------------------------
 local BUILDING_ENEMIES = {
 	["McDonald's"] = {
-		{ name = "McGuard1",    offset = Vector3.new(  0, 5,   0), level = 1 },
-		{ name = "McGuard2",    offset = Vector3.new( 30, 5,   0), level = 1 },
-		{ name = "McHunter",    offset = Vector3.new(-30, 5,  20), level = 2 },
+		{ name = "McGuard1", offset = Vector3.new(0, 5, 0), level = 1 },
+		{ name = "McGuard2", offset = Vector3.new(30, 5, 0), level = 1 },
+		{ name = "McHunter", offset = Vector3.new(-30, 5, 20), level = 2 },
 	},
 	["Dodo's pizza Restaurant"] = {
-		{ name = "PizzaWolf1",  offset = Vector3.new(  0, 5,   0), level = 1 },
-		{ name = "PizzaWolf2",  offset = Vector3.new( 20, 5,  20), level = 1 },
-		{ name = "PizzaBear",   offset = Vector3.new(-20, 5, -20), level = 2 },
+		{ name = "PizzaWolf1", offset = Vector3.new(0, 5, 0), level = 1 },
+		{ name = "PizzaWolf2", offset = Vector3.new(20, 5, 20), level = 1 },
+		{ name = "PizzaBear", offset = Vector3.new(-20, 5, -20), level = 2 },
 	},
 	["Model"] = { -- castle
-		{ name = "CastleGuard1",    offset = Vector3.new(  0, 5,   0), level = 2 },
-		{ name = "CastleGuard2",    offset = Vector3.new( 50, 5,   0), level = 2 },
-		{ name = "CastleOccultist", offset = Vector3.new(-50, 5,  0),  level = 3 },
-		{ name = "CastleWraith",    offset = Vector3.new(  0, 5,  50), level = 3 },
+		{ name = "CastleGuard1", offset = Vector3.new(0, 5, 0), level = 2 },
+		{ name = "CastleGuard2", offset = Vector3.new(50, 5, 0), level = 2 },
+		{ name = "CastleOccultist", offset = Vector3.new(-50, 5, 0), level = 3 },
+		{ name = "CastleWraith", offset = Vector3.new(0, 5, 50), level = 3 },
 	},
 }
 
@@ -59,12 +59,12 @@ local BUILDING_ENEMIES = {
 -- Open-map roaming enemies (patrol the area between buildings)
 -- -------------------------------------------------------------------------
 local MAP_ENEMIES = {
-	{ name = "Drifter1",  pos = Vector3.new(-280, 5, -280), level = 1 },
-	{ name = "Drifter2",  pos = Vector3.new( 280, 5, -280), level = 1 },
-	{ name = "Stalker1",  pos = Vector3.new(-280, 5,  280), level = 2 },
-	{ name = "Stalker2",  pos = Vector3.new( 280, 5,  280), level = 2 },
-	{ name = "Phantom1",  pos = Vector3.new(-420, 5,    0), level = 3 },
-	{ name = "Phantom2",  pos = Vector3.new(   0, 5, -420), level = 3 },
+	{ name = "Drifter1", pos = Vector3.new(-280, 5, -280), level = 1 },
+	{ name = "Drifter2", pos = Vector3.new(280, 5, -280), level = 1 },
+	{ name = "Stalker1", pos = Vector3.new(-280, 5, 280), level = 2 },
+	{ name = "Stalker2", pos = Vector3.new(280, 5, 280), level = 2 },
+	{ name = "Phantom1", pos = Vector3.new(-420, 5, 0), level = 3 },
+	{ name = "Phantom2", pos = Vector3.new(0, 5, -420), level = 3 },
 }
 
 -- -------------------------------------------------------------------------
