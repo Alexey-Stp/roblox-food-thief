@@ -407,7 +407,7 @@ function EnemyAI.spawn(creatureName, startPosition, Config, level)
 	-- AI loop: chase food-carriers or wander
 	task.spawn(function()
 		while alive do
-			task.wait(0.5)
+			task.wait(0.25)
 			if not (waiter and waiter.Parent and humanoid) then
 				break
 			end
