@@ -52,7 +52,7 @@ Use the lift platforms (press **E** on the lift) or the exterior staircase (east
 | Buy Speed Boost                 | −100 Money                        |
 | Buy Jump Boost                  | −150 Money                        |
 
-You can carry at most 25 food items. Speed is capped at 40 and jump power at 100; the shop won't charge you once you're at the cap. Food from the **Food Multiplier** can't be multiplied again.
+You can carry at most 25 food items. The shop won't charge you once you're at the speed / jump cap (`Config.MAX_WALK_SPEED` / `MAX_JUMP_POWER`). Food from the **Food Multiplier** can't be multiplied again.
 
 ## Development Setup
 
@@ -91,6 +91,7 @@ src/
 │       ├── ChestSystem.lua         loot chests + server-validated guns
 │       ├── SkyHotel.lua            sky castle, healing food, teleporters
 │       ├── AmbientCreatures.lua    cosmetic dogs & cats
+│       ├── WorldPopulation.lua     places imported buildings, spawns outdoor enemies
 │       └── ToolUtil.lua            food-tool factory, IsFood checks, teleports
 ├── client/
 │   ├── Effects.client.lua          hit flash, sparkle FX, bat hit sound

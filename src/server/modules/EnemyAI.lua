@@ -331,27 +331,57 @@ end
 -- -------------------------------------------------------------------------
 local BUILDERS = { buildWolf, buildBear, buildOccultist }
 
--- True when a player is on this creature's floor and inside the hotel footprint
-local function isOnFloor(Config, position, floorY)
+local OUTDOOR_ROAM_MIN = 10 -- studs from spawn point (outdoor creatures)
+local OUTDOOR_ROAM_MAX = 40
+
+local function insideHotelFootprint(Config, position)
 	local center = Config.HOTEL_CENTER
-	local half = Config.HOTEL_SIZE / 2
-	return math.abs(position.Y - floorY) < Config.FLOOR_HEIGHT * 0.6
-		and math.abs(position.X - center.X) < half.X
-		and math.abs(position.Z - center.Z) < half.Z
+	return math.abs(position.X - center.X) < Config.HOTEL_SIZE.X / 2
+		and math.abs(position.Z - center.Z) < Config.HOTEL_SIZE.Z / 2
 end
 
-local function pickWanderGoal(Config, floorY)
-	local angle = math.random() * math.pi * 2
-	local radius = math.random(20, 60)
-	local center = Config.HOTEL_CENTER
-	return Vector3.new(center.X + math.cos(angle) * radius, floorY, center.Z + math.sin(angle) * radius)
+-- Two behaviour modes, chosen from the spawn position:
+--   • Hotel creatures (spawned inside the footprint) patrol their floor and
+--     only notice players on that floor inside the hotel.
+--   • Outdoor creatures (WorldPopulation: buildings, open map) guard the area
+--     around their spawn point and notice players at roughly their height.
+local function makeBehaviour(Config, startPosition, level)
+	if insideHotelFootprint(Config, startPosition) then
+		local floorY = Config.HOTEL_CENTER.Y + (level - 1) * Config.FLOOR_HEIGHT + 1
+		return {
+			homeY = floorY,
+			canSee = function(position)
+				return math.abs(position.Y - floorY) < Config.FLOOR_HEIGHT * 0.6
+					and insideHotelFootprint(Config, position)
+			end,
+			pickGoal = function()
+				local angle = math.random() * math.pi * 2
+				local radius = math.random(20, 60)
+				local center = Config.HOTEL_CENTER
+				return Vector3.new(center.X + math.cos(angle) * radius, floorY, center.Z + math.sin(angle) * radius)
+			end,
+		}
+	end
+
+	return {
+		homeY = startPosition.Y,
+		canSee = function(position)
+			return math.abs(position.Y - startPosition.Y) < Config.FLOOR_HEIGHT * 0.6
+				and not insideHotelFootprint(Config, position)
+		end,
+		pickGoal = function()
+			local angle = math.random() * math.pi * 2
+			local radius = math.random(OUTDOOR_ROAM_MIN, OUTDOOR_ROAM_MAX)
+			return startPosition + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+		end,
+	}
 end
 
 function EnemyAI.spawn(creatureName, startPosition, Config, level)
 	local speeds = Config.LEVEL_SPEEDS[level] or Config.LEVEL_SPEEDS[1]
 	local CHASE = speeds.chase
 	local WANDER = speeds.wander
-	local floorY = Config.HOTEL_CENTER.Y + (level - 1) * Config.FLOOR_HEIGHT + 1
+	local behaviour = makeBehaviour(Config, startPosition, level)
 
 	local build = BUILDERS[level] or BUILDERS[1]
 	local waiter, torso, _, humanoid, eyeLight = build(creatureName, startPosition)
@@ -435,13 +465,13 @@ function EnemyAI.spawn(creatureName, startPosition, Config, level)
 		end
 	end)
 
-	-- AI loop: chase food-carriers on this floor, otherwise wander
+	-- AI loop: chase food-carriers this creature can see, otherwise wander
 	task.spawn(function()
 		local wanderGoal = nil
 		local wanderSince = 0
 
 		while alive do
-			task.wait(0.5)
+			task.wait(0.25)
 			if not (alive and waiter.Parent and humanoid.Health > 0) then
 				break
 			end
@@ -452,7 +482,7 @@ function EnemyAI.spawn(creatureName, startPosition, Config, level)
 			for _, player in ipairs(Players:GetPlayers()) do
 				local char = player.Character
 				local hrp = char and char:FindFirstChild("HumanoidRootPart")
-				if hrp and isOnFloor(Config, hrp.Position, floorY) and ToolUtil.hasFood(player) then
+				if hrp and behaviour.canSee(hrp.Position) and ToolUtil.hasFood(player) then
 					local dist = (hrp.Position - torso.Position).Magnitude
 					if dist < nearestDistance then
 						nearestPlayer = player
@@ -472,9 +502,14 @@ function EnemyAI.spawn(creatureName, startPosition, Config, level)
 				-- Keep the same goal until reached or timed out (no 2 Hz jitter)
 				local now = os.clock()
 				local reached = wanderGoal
-					and (Vector3.new(torso.Position.X, floorY, torso.Position.Z) - wanderGoal).Magnitude < 4
+					and (Vector3.new(torso.Position.X, behaviour.homeY, torso.Position.Z) - Vector3.new(
+							wanderGoal.X,
+							behaviour.homeY,
+							wanderGoal.Z
+						)).Magnitude
+						< 4
 				if not wanderGoal or reached or now - wanderSince > (Config.CREATURE_WANDER_TIMEOUT or 6) then
-					wanderGoal = pickWanderGoal(Config, floorY)
+					wanderGoal = behaviour.pickGoal()
 					wanderSince = now
 					humanoid:MoveTo(wanderGoal)
 				end

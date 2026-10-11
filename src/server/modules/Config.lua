@@ -27,9 +27,9 @@ Config.TABLES_PER_FLOOR = { 8, 6, 4 }
 -- Enemy behaviour — per level [1]=wolves [2]=bears [3]=occultists
 -- -------------------------------------------------------------------------
 Config.LEVEL_SPEEDS = {
-	{ chase = 12, wander = 7 }, -- Floor 1: Wolves
-	{ chase = 18, wander = 12 }, -- Floor 2: Bears
-	{ chase = 28, wander = 18 }, -- Floor 3: Occultists
+	{ chase = 16, wander = 9 }, -- Floor 1: Wolves
+	{ chase = 24, wander = 15 }, -- Floor 2: Bears
+	{ chase = 36, wander = 22 }, -- Floor 3: Occultists
 }
 Config.CREATURES_PER_LEVEL = 3
 Config.DETECTION_RANGE = 80 -- studs; food-carrier detection radius
@@ -76,8 +76,8 @@ Config.JUMP_BOOST = 15 -- JumpPower added per purchase
 Config.DEFAULT_WALK_SPEED = 16
 Config.DEFAULT_JUMP_POWER = 50
 -- Upper limits reachable through shop purchases
-Config.MAX_WALK_SPEED = 40
-Config.MAX_JUMP_POWER = 100
+Config.MAX_WALK_SPEED = 500 -- hard cap on WalkSpeed
+Config.MAX_JUMP_POWER = 500 -- hard cap on JumpPower
 
 -- -------------------------------------------------------------------------
 -- Prize box
@@ -193,9 +193,9 @@ Config.CHEST_RESPAWN_TIME = 60 -- seconds before an opened chest reappears
 -- Guard (hunter) NPCs — Floor 1 only
 -- -------------------------------------------------------------------------
 Config.GUARD_ALERT_RANGE = 60 -- studs: react to theft within this radius
-Config.GUARD_CATCH_RANGE = 5 -- studs: triggers catch sequence
-Config.GUARD_CHASE_SPEED = 14 -- WalkSpeed while chasing
-Config.GUARD_PATROL_SPEED = 6 -- WalkSpeed while patrolling
+Config.GUARD_CATCH_RANGE = 9 -- studs: triggers catch sequence
+Config.GUARD_CHASE_SPEED = 20 -- WalkSpeed while chasing
+Config.GUARD_PATROL_SPEED = 8 -- WalkSpeed while patrolling
 Config.GUARD_CHASE_TIMEOUT = 20 -- seconds before guard abandons chase
 Config.GUARD_LOSE_RANGE = 120 -- studs: target this far away is abandoned
 Config.GUARD_COUNT = 3 -- number of guards spawned on floor 1

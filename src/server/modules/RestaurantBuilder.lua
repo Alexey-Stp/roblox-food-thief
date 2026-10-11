@@ -1347,8 +1347,7 @@ function RestaurantBuilder.build(Config)
 	buildRiver(hotel, Config)
 	buildHills(hotel, Config)
 
-	-- Trees: ring around hotel + scattered across the wider map
-	buildRestaurantTrees(hotel, Config)
+	-- Trees scattered across the wider map (the ring around the hotel is built above)
 	buildWorldTrees(hotel, Config)
 
 	return hotel, floorFoodPositions

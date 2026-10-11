@@ -46,6 +46,7 @@ Specs reload a module with fresh state by clearing `package.loaded["src.server.m
 | `src/server/` | `ServerScriptService/GameServer` |
 | `src/client/` | `StarterPlayer/StarterPlayerScripts/GameClient` |
 | `src/shared/` | `ReplicatedStorage/Shared` |
+| `src/world/` | `Workspace` (imported `.rbxmx` buildings and models; `WorldPopulation` positions them at runtime) |
 
 **Server boot order.** [Main.server.lua](src/server/Main.server.lua) is the only server Script. Every system is a ModuleScript in `src/server/modules/` and has no top-level side effects. Main wires them in three phases:
 1. `X.init(deps...)`: pass in dependencies such as `RemoteEvents`, `Config` and `GameSystems`, and connect remote handlers. `GameSystems.init` runs first because players may already be in the server.
@@ -64,6 +65,8 @@ To add a new system, require it with `safeRequire` and add it to every phase it 
 - Flying carpets send nothing. `FlyingCarpet` samples each rider's `HumanoidRootPart` on the server and rubber-bands illegal speed or height. Server-initiated teleports must use `ToolUtil.teleport`, which stamps `LastServerTeleport` so the validator doesn't snap the player back.
 - Server → client: `Notify` (toast, shown by `Hud`) is the only way to give one player text feedback. A ProximityPrompt's text is shared by everyone, so never change `ActionText` for one player's feedback. Other feedback events: `HitFlash`, `BatHit`, `FoodStolen`, `FridgeStoredFeedback`, `CarpetSpawned`, `CarpetRevoked`.
 - `FoodSystem` fires `FoodStolenServer` (a BindableEvent) to alert `HunterAI`.
+
+**Creatures have two behaviour modes, chosen from the spawn position** (`EnemyAI.spawn`). A creature spawned inside the hotel footprint patrols its floor and only notices players on that floor. A creature spawned outside (by `WorldPopulation`) guards the area around its spawn point and ignores players inside the hotel.
 
 **Cosmetic work runs on the client.** The airplane model (`AirplaneFlight` event → `AirplaneClient`), the birds (`AmbientBirds`) and the day/night colour blend (`DayNightLighting`) are animated locally. The server only owns state that affects gameplay: `Lighting.ClockTime`, the `DayLength` attribute on Lighting, and air-drop food. Unanchored NPCs and loot call `ToolUtil.claimNetworkOwnership` so clients can't move them.
 

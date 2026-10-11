@@ -170,8 +170,8 @@ local function applySettings(player)
 end
 
 -- Saved WalkSpeed / JumpPower. Values above the shop cap can't come from a
--- purchase — they are leftovers of the old 500/500 debug defaults — so they
--- reset to the default instead of granting free max upgrades.
+-- purchase (e.g. leftovers of an older, higher cap), so they reset to the
+-- default instead of granting free max upgrades.
 local function loadMovementValue(saved, default, max)
 	if type(saved) ~= "number" or saved > max then
 		return default

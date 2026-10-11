@@ -22,7 +22,7 @@ local HunterAI = {}
 local Config = nil
 local GameSystems = nil
 
-local TICK = 0.25 -- controller loop interval
+local TICK = 0.3 -- controller loop interval
 local PATH_MAX_AGE = 1.5 -- seconds before a chase path is recomputed
 local PATH_TARGET_DRIFT = 8 -- studs the target may move before recomputing
 local WAYPOINT_REACHED = 3 -- studs
@@ -199,11 +199,11 @@ end
 -- -------------------------------------------------------------------------
 local function computePath(fromPos, toPos)
 	local path = PathfindingService:CreatePath({
-		AgentRadius = 2,
+		AgentRadius = 1.5,
 		AgentHeight = 5,
 		AgentCanJump = false,
 		AgentCanClimb = false,
-		WaypointSpacing = 4,
+		WaypointSpacing = 2,
 	})
 	local ok = pcall(function()
 		path:ComputeAsync(fromPos, toPos)

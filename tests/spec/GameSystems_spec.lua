@@ -311,12 +311,18 @@ describe("GameSystems", function()
             assert.equals(1234, storeData()["555"].score)
         end)
 
-        it("loads stats and resets legacy 500 WalkSpeed / JumpPower saves to defaults", function()
+        it("loads stats and resets out-of-range WalkSpeed / JumpPower saves to defaults", function()
             local GS = loadGameSystems()
             local Config = loadConfig()
             GS.init(Config)
             local Players = game:GetService("Players")
-            storeData()["777"] = { money = 300, score = 50, walkSpeed = 500, jumpPower = 500, fridgeLevel = 4 }
+            storeData()["777"] = {
+                money = 300,
+                score = 50,
+                walkSpeed = Config.MAX_WALK_SPEED + 1,
+                jumpPower = Config.MAX_JUMP_POWER + 1,
+                fridgeLevel = 4,
+            }
 
             local player = makeLivePlayer(777)
             Players._onPlayerAdded(player)

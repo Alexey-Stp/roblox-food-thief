@@ -22,6 +22,10 @@
       "Shared": {
         "$path": "src/shared"
       }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$path": "src/world"
     }
   }
 }
