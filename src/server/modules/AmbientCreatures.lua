@@ -1,7 +1,10 @@
 -- AmbientCreatures.lua
--- Non-interactive ambient wildlife: Dogs, Cats, and Birds.
+-- Non-interactive ambient wildlife: Dogs and Cats.
 -- Purely cosmetic — no damage, no interaction, no DataStore.
--- Dogs and cats wander slowly on the ground; birds circle at low altitude.
+-- Dogs and cats wander slowly on the ground.
+-- Birds are purely visual and run client-side (AmbientBirds.client.lua).
+
+local ToolUtil = require(script.Parent.ToolUtil)
 
 local AmbientCreatures = {}
 
@@ -186,49 +189,11 @@ local function buildCat(pos, parent)
 end
 
 -- -------------------------------------------------------------------------
--- Bird model (small white part, flies in a circle)
--- -------------------------------------------------------------------------
-local function buildBird(centerPos, altitude, parent)
-	local model = Instance.new("Model")
-	model.Name = "AmbientBird"
-	model.Parent = parent
-
-	local body = makePart(
-		"Body",
-		Vector3.new(0.6, 0.3, 0.9),
-		centerPos + Vector3.new(0, altitude, 0),
-		"White",
-		Enum.Material.SmoothPlastic,
-		model
-	)
-	body.Anchored = true
-
-	local wingL = makePart(
-		"WingL",
-		Vector3.new(0.9, 0.1, 0.4),
-		body.Position + Vector3.new(0.75, 0, 0),
-		"White",
-		Enum.Material.SmoothPlastic,
-		model
-	)
-	wingL.Anchored = true
-	local wingR = makePart(
-		"WingR",
-		Vector3.new(0.9, 0.1, 0.4),
-		body.Position + Vector3.new(-0.75, 0, 0),
-		"White",
-		Enum.Material.SmoothPlastic,
-		model
-	)
-	wingR.Anchored = true
-
-	return model, body, wingL, wingR, centerPos, altitude
-end
-
--- -------------------------------------------------------------------------
 -- AI loops
 -- -------------------------------------------------------------------------
 local function startDogCatAI(model, root, humanoid, range)
+	-- Server owns the physics so nearby clients cannot fling the animals
+	ToolUtil.claimNetworkOwnership(root)
 	local alive = true
 	model.AncestryChanged:Connect(function()
 		if not model.Parent then
@@ -251,35 +216,6 @@ local function startDogCatAI(model, root, humanoid, range)
 			local goal = home + Vector3.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
 			if humanoid and humanoid.Health > 0 then
 				humanoid:MoveTo(goal)
-			end
-		end
-	end)
-end
-
-local function startBirdAI(body, wingL, wingR, centerPos, altitude)
-	local rng = Random.new()
-	local radius = rng:NextNumber(12, 25)
-	local speed = rng:NextNumber(0.4, 0.8) -- radians/sec
-	local angle = rng:NextNumber(0, math.pi * 2)
-	local wingUp = true
-	local wingTimer = 0
-
-	task.spawn(function()
-		while body and body.Parent do
-			task.wait(0.05)
-			angle = angle + speed * 0.05
-			local bx = centerPos.X + math.cos(angle) * radius
-			local bz = centerPos.Z + math.sin(angle) * radius
-			local by = altitude + math.sin(angle * 3) * 1.5 -- gentle altitude bob
-			body.CFrame = CFrame.new(bx, by, bz) * CFrame.Angles(0, angle + math.pi / 2, 0)
-			-- Wing flap
-			wingTimer = wingTimer + 0.05
-			if wingTimer >= 0.3 then
-				wingTimer = 0
-				wingUp = not wingUp
-				local tilt = wingUp and math.rad(25) or math.rad(-10)
-				wingL.CFrame = body.CFrame * CFrame.new(0.75, 0, 0) * CFrame.Angles(0, 0, tilt)
-				wingR.CFrame = body.CFrame * CFrame.new(-0.75, 0, 0) * CFrame.Angles(0, 0, -tilt)
 			end
 		end
 	end)
@@ -320,22 +256,6 @@ function AmbientCreatures.spawnAll()
 	for _, pos in ipairs(catPositions) do
 		local model, root, humanoid = buildCat(pos, parent)
 		startDogCatAI(model, root, humanoid, 10)
-	end
-
-	-- Bird centres and altitudes
-	local birdDefs = {
-		{ Vector3.new(-150, 0, 50), 18 },
-		{ Vector3.new(80, 0, -150), 22 },
-		{ Vector3.new(200, 0, 100), 16 },
-		{ Vector3.new(-80, 0, 200), 20 },
-		{ Vector3.new(0, 0, -180), 25 },
-		{ Vector3.new(160, 0, -50), 19 },
-		{ Vector3.new(-200, 0, -100), 23 },
-		{ Vector3.new(300, 0, 200), 17 },
-	}
-	for _, def in ipairs(birdDefs) do
-		local _, body, wingL, wingR = buildBird(def[1], def[2], parent)
-		startBirdAI(body, wingL, wingR, def[1], def[2])
 	end
 end
 

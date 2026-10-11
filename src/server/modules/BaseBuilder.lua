@@ -4,18 +4,37 @@
 -- world money leaderboard, prize box, trees and the food multiplier machine.
 
 local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
+
+local ToolUtil = require(script.Parent.ToolUtil)
 
 local BaseBuilder = {}
 
 local GameSystems = nil
 local Config = nil
+local RemoteEvents = nil
 
 -- Per-player prize box cooldown timestamps
 local prizeBoxCooldowns = {}
 
-function BaseBuilder.init(gameSystems, config)
+-- Per-player Food Multiplier jobs: [UserId] = { items = { foodType, ... }, readyAt = os.clock() }
+local multiplierJobs = {}
+
+function BaseBuilder.init(gameSystems, config, remoteEvents)
 	GameSystems = gameSystems
 	Config = config
+	RemoteEvents = remoteEvents
+
+	Players.PlayerRemoving:Connect(function(player)
+		prizeBoxCooldowns[player.UserId] = nil
+		multiplierJobs[player.UserId] = nil
+	end)
+end
+
+local function notify(player, text)
+	if RemoteEvents then
+		RemoteEvents.Notify:FireClient(player, text)
+	end
 end
 
 -- -------------------------------------------------------------------------
@@ -41,8 +60,8 @@ end
 
 -- -------------------------------------------------------------------------
 -- Fridge — builds the physical fridge Part only.
--- Interaction logic (level-up, value bonus, BillboardGui) is handled by
--- RefrigeratorSystem.lua which scans workspace for Parts tagged "Fridge".
+-- Interaction logic (prompts, per-player levels, BillboardGui) is handled by
+-- RefrigeratorSystem.lua, which finds fridges via the "Fridge" CollectionService tag.
 -- -------------------------------------------------------------------------
 local function buildFridge(baseModel, position, fridgeIndex)
 	local fridge = Instance.new("Part")
@@ -54,9 +73,8 @@ local function buildFridge(baseModel, position, fridgeIndex)
 	fridge.Material = Enum.Material.Metal
 	-- Tag for RefrigeratorSystem to locate and enhance
 	fridge:SetAttribute("FridgeId", fridgeIndex)
-	fridge:SetAttribute("FridgeLevel", 1)
-	fridge:SetAttribute("NextUpgradeCost", 100) -- math.floor(100 * 1^1.5)
 	fridge.Parent = baseModel
+	CollectionService:AddTag(fridge, "Fridge")
 
 	local door = Instance.new("Part")
 	door.Name = "FridgeDoor" .. fridgeIndex
@@ -75,7 +93,7 @@ local function buildFridge(baseModel, position, fridgeIndex)
 	light.Range = 8
 	light.Parent = fridge
 
-	addSurfaceLabel(fridge, Enum.NormalId.Front, "Fridge " .. fridgeIndex .. "\nLevel 1", Color3.new(0, 1, 1))
+	addSurfaceLabel(fridge, Enum.NormalId.Front, "Fridge " .. fridgeIndex, Color3.new(0, 1, 1))
 
 	return fridge
 end
@@ -104,22 +122,10 @@ local function buildSellStand(baseModel, basePosition)
 	prompt.Parent = stall
 
 	prompt.Triggered:Connect(function(player)
-		local character = player.Character
-		local tools = {}
-
-		if character then
-			local eq = character:FindFirstChildOfClass("Tool")
-			if eq then
-				table.insert(tools, eq)
-			end
-		end
-		for _, t in ipairs(player.Backpack:GetChildren()) do
-			if t:IsA("Tool") then
-				table.insert(tools, t)
-			end
-		end
-
+		-- Only food is sold; bat, carpet and weapons are never touched
+		local tools = ToolUtil.getFoodTools(player)
 		if #tools == 0 then
+			notify(player, "You have no food to sell")
 			return
 		end
 
@@ -127,22 +133,17 @@ local function buildSellStand(baseModel, basePosition)
 		for _, tool in ipairs(tools) do
 			-- Prefer fridge-boosted CurrentSellPrice attribute; fall back to Config
 			local handle = tool:FindFirstChild("Handle")
-			local price = handle and handle:GetAttribute("CurrentSellPrice")
+			local price = handle:GetAttribute("CurrentSellPrice")
 			if not price or price == 0 then
-				for _, ft in ipairs(Config.FOOD_TYPES) do
-					if ft.name == tool.Name then
-						price = ft.sellPrice or 0
-						break
-					end
-				end
+				local ft = ToolUtil.findFoodType(Config.FOOD_TYPES, tool.Name)
+				price = ft and ft.sellPrice or 0
 			end
-			totalEarned = totalEarned + (price or 0)
+			totalEarned = totalEarned + price
 			tool:Destroy()
 		end
 
-		if totalEarned > 0 and GameSystems then
-			GameSystems.onFoodSold(player, totalEarned)
-		end
+		GameSystems.addMoney(player, totalEarned)
+		notify(player, "Sold " .. #tools .. " food for $" .. totalEarned)
 	end)
 end
 
@@ -161,7 +162,8 @@ local function buildShop(baseModel, basePosition)
 
 	addSurfaceLabel(booth, Enum.NormalId.Front, "SHOP", Color3.new(1, 1, 1))
 
-	local function makeShopSign(name, pos, labelText, promptText, cost, applyBoost)
+	-- computeBoost(walkSpeed, jumpPower) -> newWalkSpeed, newJumpPower (from cached settings)
+	local function makeShopSign(name, pos, labelText, promptText, cost, computeBoost)
 		local signPart = Instance.new("Part")
 		signPart.Name = name
 		signPart.Size = Vector3.new(6, 3, 0.3)
@@ -181,28 +183,29 @@ local function buildShop(baseModel, basePosition)
 		prompt.Parent = signPart
 
 		prompt.Triggered:Connect(function(player)
-			local ls = player:FindFirstChild("leaderstats")
-			if not ls then
+			-- Work from cached settings, never the live Humanoid (it may be stunned)
+			local walkSpeed, jumpPower = GameSystems.getSettings(player)
+			if not walkSpeed then
 				return
 			end
-			local money = ls:FindFirstChild("Money")
-			if not money or money.Value < cost then
+			local newWalk, newJump = computeBoost(walkSpeed, jumpPower)
+			if newWalk == walkSpeed and newJump == jumpPower then
+				notify(player, "Already at the maximum!")
+				return
+			end
+			if not GameSystems.trySpend(player, cost) then
+				notify(player, "Need $" .. cost)
 				return
 			end
 
+			GameSystems.updateSettings(player, newWalk, newJump)
+			-- A stunned player gets the new values when the stun ends
 			local char = player.Character
-			if not char then
-				return
+			local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+			if humanoid and not humanoid:GetAttribute("Stunned") then
+				GameSystems.applySettings(player)
 			end
-			local humanoid = char:FindFirstChildOfClass("Humanoid")
-			if not humanoid then
-				return
-			end
-
-			money.Value = money.Value - cost
-			applyBoost(humanoid)
-			-- Persist the new WalkSpeed / JumpPower so they survive respawn / rejoin
-			GameSystems.updateSettings(player, humanoid.WalkSpeed, humanoid.JumpPower)
+			notify(player, promptText .. " purchased!")
 		end)
 	end
 
@@ -212,8 +215,8 @@ local function buildShop(baseModel, basePosition)
 		"Speed Boost\n" .. Config.SHOP_SPEED_COST .. "$",
 		"Buy Speed Boost",
 		Config.SHOP_SPEED_COST,
-		function(h)
-			h.WalkSpeed = math.min(h.WalkSpeed + Config.SPEED_BOOST, 40)
+		function(walkSpeed, jumpPower)
+			return math.min(walkSpeed + Config.SPEED_BOOST, Config.MAX_WALK_SPEED), jumpPower
 		end
 	)
 
@@ -223,8 +226,8 @@ local function buildShop(baseModel, basePosition)
 		"Jump Boost\n" .. Config.SHOP_JUMP_COST .. "$",
 		"Buy Jump Boost",
 		Config.SHOP_JUMP_COST,
-		function(h)
-			h.JumpPower = math.min(h.JumpPower + Config.JUMP_BOOST, 100)
+		function(walkSpeed, jumpPower)
+			return walkSpeed, math.min(jumpPower + Config.JUMP_BOOST, Config.MAX_JUMP_POWER)
 		end
 	)
 end
@@ -357,23 +360,19 @@ local function buildPrizeBox(baseModel, basePosition)
 	prompt.Parent = box
 
 	prompt.Triggered:Connect(function(player)
-		local now = tick()
-		local lastOpen = prizeBoxCooldowns[player.UserId] or 0
-		if now - lastOpen < Config.PRIZE_BOX_COOLDOWN then
-			-- Show a hint how long until ready again
+		local now = os.clock()
+		local lastOpen = prizeBoxCooldowns[player.UserId]
+		if lastOpen and now - lastOpen < Config.PRIZE_BOX_COOLDOWN then
+			-- Per-player hint (a prompt's text is shared by everyone)
 			local remaining = math.ceil(Config.PRIZE_BOX_COOLDOWN - (now - lastOpen))
-			prompt.ActionText = "Ready in " .. remaining .. "s"
-			task.delay(2, function()
-				prompt.ActionText = "Open Prize Box"
-			end)
+			notify(player, "Prize box ready in " .. remaining .. "s")
 			return
 		end
 		prizeBoxCooldowns[player.UserId] = now
 
 		local reward = math.random(Config.PRIZE_BOX_MIN, Config.PRIZE_BOX_MAX)
-		if GameSystems then
-			GameSystems.onFoodSold(player, reward)
-		end
+		GameSystems.addMoney(player, reward)
+		notify(player, "Prize box: +$" .. reward .. "!")
 
 		-- Visual pop: brief bright flash
 		local origColor = box.BrickColor
@@ -381,16 +380,6 @@ local function buildPrizeBox(baseModel, basePosition)
 		task.delay(0.2, function()
 			box.BrickColor = origColor
 		end)
-
-		prompt.ActionText = "Got $" .. reward .. "!"
-		task.delay(2, function()
-			prompt.ActionText = "Open Prize Box"
-		end)
-	end)
-
-	-- Cleanup cooldown entry when player leaves
-	Players.PlayerRemoving:Connect(function(player)
-		prizeBoxCooldowns[player.UserId] = nil
 	end)
 end
 
@@ -527,108 +516,89 @@ function BaseBuilder.build()
 	machineSign.Parent = baseModel
 	local signLabel = addSurfaceLabel(machineSign, Enum.NormalId.Front, "FOOD MULTIPLIER", Color3.new(0, 1, 0))
 
-	local isProcessing = false
-	local storedFood = {}
-
 	local craftPrompt = Instance.new("ProximityPrompt")
-	craftPrompt.ActionText = "Insert Food"
+	craftPrompt.ActionText = "Use Food Multiplier"
 	craftPrompt.ObjectText = "Food Multiplier"
 	craftPrompt.KeyboardKeyCode = Enum.KeyCode.E
 	craftPrompt.RequiresLineOfSight = false
 	craftPrompt.MaxActivationDistance = 10
 	craftPrompt.Parent = craftMachine
 
-	craftPrompt.Triggered:Connect(function(player)
-		if isProcessing then
-			if #storedFood > 0 then
-				for _, foodData in ipairs(storedFood) do
-					local tool = Instance.new("Tool")
-					tool.Name = foodData.name
-					tool.RequiresHandle = true
-					local handle = Instance.new("Part")
-					handle.Name = "Handle"
-					handle.Size = foodData.size
-					handle.BrickColor = foodData.color
-					handle.Material = Enum.Material.SmoothPlastic
-					if foodData.texture then
-						local decal = Instance.new("Decal")
-						decal.Texture = foodData.texture
-						decal.Face = Enum.NormalId.Top
-						decal.Parent = handle
-					end
-					handle.Parent = tool
-					tool.Parent = player.Backpack
-				end
+	-- Machine visuals reflect whether ANY player has a job running
+	local function refreshMachineVisuals()
+		local busy = next(multiplierJobs) ~= nil
+		indicator.BrickColor = busy and BrickColor.new("Bright yellow") or BrickColor.new("Lime green")
+		indicatorLight.Color = busy and Color3.new(1, 1, 0) or Color3.new(0, 1, 0)
+		chamber.Transparency = busy and 0.1 or 0.3
+		signLabel.Text = busy and "FOOD MULTIPLIER (BUSY)" or "FOOD MULTIPLIER"
+	end
 
-				if GameSystems then
-					GameSystems.onFoodCollected(player, #storedFood)
-				end
-
-				storedFood = {}
-				isProcessing = false
-				indicator.BrickColor = BrickColor.new("Lime green")
-				indicatorLight.Color = Color3.new(0, 1, 0)
-				indicator.Transparency = 0
-				craftPrompt.ActionText = "Insert Food"
-				signLabel.Text = "FOOD MULTIPLIER"
-				signLabel.TextColor3 = Color3.new(0, 1, 0)
-				chamber.Transparency = 0.3
-			end
+	local function collect(player, job)
+		local room = Config.MAX_FOOD_CARRIED - ToolUtil.countFood(player)
+		local given = 0
+		while given < room and #job.items > 0 do
+			local ft = table.remove(job.items)
+			ToolUtil.makeFoodTool(ft, { multiplied = true }).Parent = player.Backpack
+			given = given + 1
+		end
+		if given > 0 then
+			GameSystems.onFoodCollected(player, given)
+		end
+		if #job.items == 0 then
+			multiplierJobs[player.UserId] = nil
+			notify(player, "Collected " .. given .. " food from the multiplier")
 		else
-			local character = player.Character
-			if not character then
-				return
+			notify(player, "Hands full! " .. #job.items .. " food still waiting in the multiplier")
+		end
+		refreshMachineVisuals()
+	end
+
+	craftPrompt.Triggered:Connect(function(player)
+		local job = multiplierJobs[player.UserId]
+		if job then
+			local remaining = job.readyAt - os.clock()
+			if remaining > 0 then
+				notify(player, string.format("Your food is processing: %ds left", math.ceil(remaining)))
+			else
+				collect(player, job)
 			end
+			return
+		end
 
-			local tool = character:FindFirstChildOfClass("Tool") or player.Backpack:FindFirstChildOfClass("Tool")
-			if not tool then
-				return
+		-- Multiplier output cannot be multiplied again (prevents exponential loops)
+		local tool = ToolUtil.findFoodTool(player, function(t)
+			return t:FindFirstChild("Handle"):GetAttribute("Multiplied") ~= true
+		end)
+		if not tool then
+			notify(player, "Insert stolen food (multiplied food can't be processed again)")
+			return
+		end
+
+		local foodType =
+			ToolUtil.findFoodType(Config.FOOD_TYPES, tool:FindFirstChild("Handle"):GetAttribute("FoodId") or tool.Name)
+		if not foodType then
+			return
+		end
+		tool:Destroy()
+
+		local items = {}
+		for _ = 1, Config.MULTIPLIER_FACTOR do
+			table.insert(items, foodType)
+		end
+		multiplierJobs[player.UserId] = { items = items, readyAt = os.clock() + Config.MULTIPLIER_TIME }
+		notify(player, foodType.name .. " inserted. Come back in " .. Config.MULTIPLIER_TIME .. "s")
+		refreshMachineVisuals()
+	end)
+
+	-- Pulse the indicator while any job is running
+	task.spawn(function()
+		while craftMachine.Parent do
+			if next(multiplierJobs) then
+				indicator.Transparency = math.abs(math.sin(os.clock() * 3)) * 0.5
+			else
+				indicator.Transparency = 0
 			end
-
-			local handle = tool:FindFirstChild("Handle")
-			if not handle then
-				return
-			end
-
-			local decalInst = handle:FindFirstChildOfClass("Decal")
-			table.insert(storedFood, {
-				name = tool.Name,
-				size = handle.Size,
-				color = handle.BrickColor,
-				texture = decalInst and decalInst.Texture or nil,
-			})
-			tool:Destroy()
-
-			isProcessing = true
-			indicator.BrickColor = BrickColor.new("Bright yellow")
-			indicatorLight.Color = Color3.new(1, 1, 0)
-			craftPrompt.ActionText = "Processing..."
-			chamber.Transparency = 0.1
-
-			task.spawn(function()
-				local startTime = tick()
-				while isProcessing and tick() - startTime < Config.MULTIPLIER_TIME do
-					indicator.Transparency = math.abs(math.sin(tick() * 3)) * 0.5
-					local timeLeft = Config.MULTIPLIER_TIME - (tick() - startTime)
-					signLabel.Text = string.format("PROCESSING: %ds", math.floor(timeLeft))
-					task.wait(0.1)
-				end
-
-				if isProcessing then
-					local origCount = #storedFood
-					for _ = 1, origCount * (Config.MULTIPLIER_FACTOR - 1) do
-						table.insert(storedFood, storedFood[math.random(1, origCount)])
-					end
-
-					indicator.BrickColor = BrickColor.new("Bright green")
-					indicatorLight.Color = Color3.new(0, 1, 0)
-					indicator.Transparency = 0
-					craftPrompt.ActionText = "Collect Food (x" .. #storedFood .. ")"
-					signLabel.Text = "READY! COLLECT FOOD"
-					signLabel.TextColor3 = Color3.new(1, 1, 0)
-					chamber.Transparency = 0
-				end
-			end)
+			task.wait(0.2)
 		end
 	end)
 

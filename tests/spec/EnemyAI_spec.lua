@@ -67,18 +67,29 @@ local function makePlayer(name, position)
     return player, character, humanoid, backpack, hrp
 end
 
--- Add a food Tool to a player's Backpack
-local function addFoodToBackpack(backpack, foodName)
+-- Build a Tool with a Handle carrying the given attribute (e.g. IsFood, IsBat)
+local function makeTaggedTool(name, attribute)
     local tool = Instance.new("Tool")
-    tool.Name = foodName or "Pizza"
+    tool.Name = name
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    if attribute then
+        handle:SetAttribute(attribute, true)
+    end
+    handle.Parent = tool
+    return tool
+end
+
+-- Add a food Tool (IsFood-tagged, as built by ToolUtil.makeFoodTool) to a Backpack
+local function addFoodToBackpack(backpack, foodName)
+    local tool = makeTaggedTool(foodName or "Pizza", "IsFood")
     tool.Parent = backpack
     return tool
 end
 
 -- Add a food Tool to a player's Character (equipped)
 local function addFoodToCharacter(character, foodName)
-    local tool = Instance.new("Tool")
-    tool.Name = foodName or "Pizza"
+    local tool = makeTaggedTool(foodName or "Pizza", "IsFood")
     tool.Parent = character
     return tool
 end
@@ -300,6 +311,35 @@ describe("EnemyAI", function()
             -- Character should have no Tools remaining
             local toolLeft = character:FindFirstChildOfClass("Tool")
             assert.is_nil(toolLeft)
+        end)
+
+        it("keeps non-food tools (bat, weapons) in the Backpack", function()
+            local EnemyAI = loadEnemyAI()
+            local Config  = loadConfig()
+            local Players = game:GetService("Players")
+            local _, model_torso = spawnCreature(EnemyAI, Config, 1)
+
+            local player, character, _, backpack = makePlayer("Erin", Vector3.new(0, 5, 0))
+            Players:_registerCharacter(player, character)
+            makeTaggedTool("Bat", "IsBat").Parent = backpack
+            makeTaggedTool("Pistol", "IsWeapon").Parent = backpack
+            addFoodToBackpack(backpack, "Pizza")
+
+            local hitPart = Instance.new("Part")
+            hitPart.Parent = character
+
+            model_torso.Touched._fire(model_torso.Touched, hitPart)
+            assert.equals(2, #backpack._children)
+            for _, item in ipairs(backpack._children) do
+                assert.are_not.equals("Pizza", item.Name)
+            end
+        end)
+
+        it("tags the creature model with IsCreature so weapons can damage it", function()
+            local EnemyAI = loadEnemyAI()
+            local Config  = loadConfig()
+            local model = spawnCreature(EnemyAI, Config, 1)
+            assert.is_true(model:GetAttribute("IsCreature"))
         end)
     end)
 

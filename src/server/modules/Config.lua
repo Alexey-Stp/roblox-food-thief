@@ -45,6 +45,7 @@ Config.CREATURE_NAMES_OCCULTIST = { "Void", "Specter", "Wraith", "Cursed", "Drea
 -- Food mechanics
 -- -------------------------------------------------------------------------
 Config.FOOD_RESPAWN_TIME = 5 -- seconds before a stolen food reappears
+Config.MAX_FOOD_CARRIED = 25 -- food tools a player may hold (backpack + equipped)
 Config.MULTIPLIER_TIME = 60 -- seconds to process food in the multiplier
 Config.MULTIPLIER_FACTOR = 2 -- duplication factor
 
@@ -57,11 +58,11 @@ Config.LIFT_DEBOUNCE = 3.0 -- seconds cooldown between lift rides
 -- -------------------------------------------------------------------------
 -- Fridge storage (player base) — level-up system
 -- -------------------------------------------------------------------------
-Config.FRIDGE_CAPACITY = 10 -- items per refrigerator
 Config.FRIDGE_COUNT = 2 -- fixed number of fridges at base
 Config.FRIDGE_MAX_LEVEL = 10 -- maximum upgrade level
-Config.FRIDGE_UPGRADE_BASE_COST = 100 -- money cost; formula: floor(100 * level^1.5)
--- Value bonus formula: finalPrice = basePrice * (1 + 0.3 * fridgeLevel)
+Config.FRIDGE_UPGRADE_BASE_COST = 100 -- money cost; formula: floor(base * level^1.5)
+Config.FRIDGE_BONUS_PER_LEVEL = 0.3 -- finalPrice = floor(basePrice * (1 + bonus * fridgeLevel))
+-- Fridge levels are per player and persisted by GameSystems.
 
 -- -------------------------------------------------------------------------
 -- Money & shop
@@ -72,8 +73,11 @@ Config.SPEED_BOOST = 8 -- WalkSpeed added per purchase
 Config.JUMP_BOOST = 15 -- JumpPower added per purchase
 
 -- Default starting movement values (applied on every spawn)
-Config.DEFAULT_WALK_SPEED = 500
-Config.DEFAULT_JUMP_POWER = 500
+Config.DEFAULT_WALK_SPEED = 16
+Config.DEFAULT_JUMP_POWER = 50
+-- Upper limits reachable through shop purchases
+Config.MAX_WALK_SPEED = 40
+Config.MAX_JUMP_POWER = 100
 
 -- -------------------------------------------------------------------------
 -- Prize box
@@ -172,12 +176,18 @@ Config.SCORE_COLLECT = 50
 Config.BAT_COOLDOWN = 0.8 -- seconds between swings (server-side)
 Config.BAT_DAMAGE = 20 -- HP removed per hit
 Config.BAT_RANGE = 10 -- studs; server spatial scan radius
+Config.PVP_ENABLED = true -- false = Bat and guns only damage NPCs and castle parts
 
 -- -------------------------------------------------------------------------
 -- Castle destructible parts (Doors / Walls inside a "Castle" model)
 -- -------------------------------------------------------------------------
 Config.CASTLE_PART_HEALTH = 100 -- default HP for Door / Wall parts
 Config.CASTLE_PART_DESTROY_DELAY = 2 -- seconds before a destroyed part is removed
+
+-- -------------------------------------------------------------------------
+-- Loot chests
+-- -------------------------------------------------------------------------
+Config.CHEST_RESPAWN_TIME = 60 -- seconds before an opened chest reappears
 
 -- -------------------------------------------------------------------------
 -- Guard (hunter) NPCs — Floor 1 only
@@ -187,7 +197,16 @@ Config.GUARD_CATCH_RANGE = 5 -- studs: triggers catch sequence
 Config.GUARD_CHASE_SPEED = 14 -- WalkSpeed while chasing
 Config.GUARD_PATROL_SPEED = 6 -- WalkSpeed while patrolling
 Config.GUARD_CHASE_TIMEOUT = 20 -- seconds before guard abandons chase
+Config.GUARD_LOSE_RANGE = 120 -- studs: target this far away is abandoned
 Config.GUARD_COUNT = 3 -- number of guards spawned on floor 1
+Config.GUARD_RESPAWN_TIME = 30 -- seconds before a defeated guard returns
+Config.GUARD_STUN_TIME = 3 -- seconds a caught player is frozen
+
+-- -------------------------------------------------------------------------
+-- Floor creatures
+-- -------------------------------------------------------------------------
+Config.CREATURE_RESPAWN_TIME = 20 -- seconds before a defeated creature returns
+Config.CREATURE_WANDER_TIMEOUT = 6 -- seconds before picking a new wander goal
 
 -- -------------------------------------------------------------------------
 -- Flying carpet (night reward)
@@ -196,7 +215,8 @@ Config.CARPET_SPAWN_POS = Vector3.new(-160, 3, 0) -- near restaurant entrance
 Config.CARPET_MAX_HEIGHT = 150 -- maximum flight altitude (Y studs)
 Config.CARPET_FLIGHT_SPEED = 60 -- horizontal studs/sec
 Config.CARPET_ASCENT_SPEED = 15 -- vertical studs/sec
-Config.CARPET_MAX_SPEED_VALIDATE = 80 -- server anti-exploit speed cap
+Config.CARPET_MAX_SPEED_VALIDATE = 80 -- server anti-exploit horizontal speed cap
+Config.CARPET_VALIDATE_INTERVAL = 0.2 -- seconds between server position samples
 
 -- -------------------------------------------------------------------------
 -- Airplanes dropping food
@@ -219,5 +239,6 @@ Config.SKY_HOTEL_FOOD_HEAL = { 20, 35, 50 } -- HP restored by the three food spo
 Config.SKY_HOTEL_FOOD_RESPAWN = 15 -- seconds before a consumed food reappears
 Config.SKY_HOTEL_CHEST_COOLDOWN = 30 -- seconds between chest opens per player
 Config.SKY_HOTEL_CHEST_REWARD = 50 -- money awarded when opening the chest
+Config.SKY_PAD_GROUND_POS = Vector3.new(40, 1.5, 230) -- ground teleporter up to the Sky Hotel
 
 return Config

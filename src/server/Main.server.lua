@@ -35,18 +35,19 @@ local ChestSystem = safeRequire(modules.ChestSystem, "ChestSystem")
 GameSystems.init(Config)
 
 -- 2. Wire RemoteEvents and dependencies into subsystems
-FoodSystem.init(RemoteEvents, GameSystems)
+FoodSystem.init(RemoteEvents, GameSystems, Config)
 EnemyAI.init(RemoteEvents)
-BaseBuilder.init(GameSystems, Config)
+BaseBuilder.init(GameSystems, Config, RemoteEvents)
 BatCombat.init(RemoteEvents, Config)
 FoodInventory.init(RemoteEvents, Config)
 RefrigeratorSystem.init(RemoteEvents, Config, GameSystems)
 FlyingCarpet.init(RemoteEvents, Config)
-AirplaneSystem.init(Config, GameSystems)
-HunterAI.init(RemoteEvents, Config)
-SkyHotel.init(Config)
+AirplaneSystem.init(Config, RemoteEvents)
+HunterAI.init(RemoteEvents, Config, GameSystems)
+-- FlyingCarpet is the only module that creates carpet tools
+SkyHotel.init(Config, GameSystems, FlyingCarpet, RemoteEvents)
 AmbientCreatures.init()
-ChestSystem.init(RemoteEvents, Config)
+ChestSystem.init(RemoteEvents, Config, FlyingCarpet)
 
 -- 3. Build the world
 print("[Main] Building Grand Hotel...")
@@ -54,6 +55,8 @@ local _, floorFoodPositions = RestaurantBuilder.build(Config)
 
 print("[Main] Building player safe base...")
 BaseBuilder.build()
+-- Fridges exist now; attach prompts + billboards (explicit, not timing-based)
+RefrigeratorSystem.registerFridges()
 
 print("[Main] Building Sky Hotel Castle...")
 SkyHotel.build()

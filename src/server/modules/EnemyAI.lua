@@ -5,6 +5,8 @@
 local Players = game:GetService("Players")
 local Debris = game:GetService("Debris")
 
+local ToolUtil = require(script.Parent.ToolUtil)
+
 local EnemyAI = {}
 
 local RemoteEvents = nil
@@ -329,6 +331,22 @@ end
 -- -------------------------------------------------------------------------
 local BUILDERS = { buildWolf, buildBear, buildOccultist }
 
+-- True when a player is on this creature's floor and inside the hotel footprint
+local function isOnFloor(Config, position, floorY)
+	local center = Config.HOTEL_CENTER
+	local half = Config.HOTEL_SIZE / 2
+	return math.abs(position.Y - floorY) < Config.FLOOR_HEIGHT * 0.6
+		and math.abs(position.X - center.X) < half.X
+		and math.abs(position.Z - center.Z) < half.Z
+end
+
+local function pickWanderGoal(Config, floorY)
+	local angle = math.random() * math.pi * 2
+	local radius = math.random(20, 60)
+	local center = Config.HOTEL_CENTER
+	return Vector3.new(center.X + math.cos(angle) * radius, floorY, center.Z + math.sin(angle) * radius)
+end
+
 function EnemyAI.spawn(creatureName, startPosition, Config, level)
 	local speeds = Config.LEVEL_SPEEDS[level] or Config.LEVEL_SPEEDS[1]
 	local CHASE = speeds.chase
@@ -338,29 +356,58 @@ function EnemyAI.spawn(creatureName, startPosition, Config, level)
 	local build = BUILDERS[level] or BUILDERS[1]
 	local waiter, torso, _, humanoid, eyeLight = build(creatureName, startPosition)
 
-	local lastHit = {}
+	-- Tag so BatCombat / weapons can damage creatures
+	waiter:SetAttribute("IsCreature", true)
+	-- Server owns NPC physics so clients cannot teleport or fling creatures
+	ToolUtil.claimNetworkOwnership(torso)
+
+	-- Weak keys: entries vanish when a Player object is garbage-collected
+	local lastHit = setmetatable({}, { __mode = "k" })
 	local alive = true
 
 	waiter.Destroying:Connect(function()
 		alive = false
 	end)
 
+	-- Death → remove the body, respawn a fresh creature later
+	if humanoid.Died then
+		humanoid.Died:Connect(function()
+			if not alive then
+				return
+			end
+			alive = false
+			task.delay(3, function()
+				if waiter.Parent then
+					waiter:Destroy()
+				end
+			end)
+			task.delay(Config.CREATURE_RESPAWN_TIME or 20, function()
+				EnemyAI.spawn(creatureName, startPosition, Config, level)
+			end)
+		end)
+	end
+
 	-- Touch: damage + food confiscation + knockback
 	torso.Touched:Connect(function(hit)
 		if not alive then
 			return
 		end
-		local humanoidHit = hit.Parent:FindFirstChildOfClass("Humanoid")
+		local character = hit.Parent
+		if not character then
+			return
+		end
+		local humanoidHit = character:FindFirstChildOfClass("Humanoid")
 		if not humanoidHit then
 			return
 		end
-		local player = Players:GetPlayerFromCharacter(hit.Parent)
+		local player = Players:GetPlayerFromCharacter(character)
 		if not player then
 			return
 		end
 
-		local now = tick()
-		if lastHit[player] and now - lastHit[player] < Config.HIT_DEBOUNCE then
+		local now = os.clock()
+		local last = lastHit[player]
+		if last and now - last < Config.HIT_DEBOUNCE then
 			return
 		end
 		lastHit[player] = now
@@ -378,37 +425,24 @@ function EnemyAI.spawn(creatureName, startPosition, Config, level)
 			RemoteEvents.HitFlash:FireClient(player)
 		end
 
-		-- Confiscate food tools but spare protected items (bat, carpet)
-		local function isProtected(item)
-			local h = item:FindFirstChild("Handle")
-			return h and (h:GetAttribute("IsBat") == true or h:GetAttribute("IsCarpet") == true)
-		end
+		-- Confiscate food only — bat, carpet and weapons are kept
+		ToolUtil.confiscateFood(player)
 
-		local character = player.Character
-		if character then
-			local equipped = character:FindFirstChildOfClass("Tool")
-			if equipped and not isProtected(equipped) then
-				equipped:Destroy()
-			end
-		end
-		for _, item in ipairs(player.Backpack:GetChildren()) do
-			if item:IsA("Tool") and not isProtected(item) then
-				item:Destroy()
-			end
-		end
-
-		local rootPart = hit.Parent:FindFirstChild("HumanoidRootPart")
+		local rootPart = character:FindFirstChild("HumanoidRootPart")
 		if rootPart and rootPart:IsA("BasePart") then
 			local direction = (hit.Position - torso.Position).Unit
 			rootPart.AssemblyLinearVelocity = direction * 50 + Vector3.new(0, 20, 0)
 		end
 	end)
 
-	-- AI loop: chase food-carriers or wander
+	-- AI loop: chase food-carriers on this floor, otherwise wander
 	task.spawn(function()
+		local wanderGoal = nil
+		local wanderSince = 0
+
 		while alive do
 			task.wait(0.5)
-			if not (waiter and waiter.Parent and humanoid) then
+			if not (alive and waiter.Parent and humanoid.Health > 0) then
 				break
 			end
 
@@ -417,51 +451,33 @@ function EnemyAI.spawn(creatureName, startPosition, Config, level)
 
 			for _, player in ipairs(Players:GetPlayers()) do
 				local char = player.Character
-				if char and char:FindFirstChild("HumanoidRootPart") then
-					-- Check for food: skip bat (IsBat) and carpet (IsCarpet) tools
-					local function isFoodTool(item)
-						if not item:IsA("Tool") then
-							return false
-						end
-						local h = item:FindFirstChild("Handle")
-						if h and (h:GetAttribute("IsBat") == true or h:GetAttribute("IsCarpet") == true) then
-							return false
-						end
-						return true
-					end
-					local hasFood = isFoodTool(char:FindFirstChildOfClass("Tool") or Instance.new("Part"))
-					if not hasFood then
-						for _, item in ipairs(player.Backpack:GetChildren()) do
-							if isFoodTool(item) then
-								hasFood = true
-								break
-							end
-						end
-					end
-
-					if hasFood then
-						local dist = (char.HumanoidRootPart.Position - torso.Position).Magnitude
-						if dist < nearestDistance then
-							nearestPlayer = player
-							nearestDistance = dist
-						end
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				if hrp and isOnFloor(Config, hrp.Position, floorY) and ToolUtil.hasFood(player) then
+					local dist = (hrp.Position - torso.Position).Magnitude
+					if dist < nearestDistance then
+						nearestPlayer = player
+						nearestDistance = dist
 					end
 				end
 			end
 
-			if nearestPlayer and nearestPlayer.Character then
+			if nearestPlayer then
 				humanoid.WalkSpeed = CHASE
 				humanoid:MoveTo(nearestPlayer.Character.HumanoidRootPart.Position)
 				eyeLight.Brightness = 5
 				eyeLight.Range = 20
+				wanderGoal = nil
 			else
 				humanoid.WalkSpeed = WANDER
-				local angle = math.random() * math.pi * 2
-				local radius = math.random(20, 60)
-				local center = Config.HOTEL_CENTER
-				humanoid:MoveTo(
-					Vector3.new(center.X + math.cos(angle) * radius, floorY, center.Z + math.sin(angle) * radius)
-				)
+				-- Keep the same goal until reached or timed out (no 2 Hz jitter)
+				local now = os.clock()
+				local reached = wanderGoal
+					and (Vector3.new(torso.Position.X, floorY, torso.Position.Z) - wanderGoal).Magnitude < 4
+				if not wanderGoal or reached or now - wanderSince > (Config.CREATURE_WANDER_TIMEOUT or 6) then
+					wanderGoal = pickWanderGoal(Config, floorY)
+					wanderSince = now
+					humanoid:MoveTo(wanderGoal)
+				end
 				eyeLight.Brightness = 2
 				eyeLight.Range = 10
 			end

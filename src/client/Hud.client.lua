@@ -2,8 +2,11 @@
 -- Displays a compact heads-up overlay.
 -- • Money indicator — bottom-right corner (small, unobtrusive)
 -- • Speed / Jump panel — top-right corner (compact stats strip)
+-- • Toasts — short server messages (Notify RemoteEvent), stacked top-centre
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local localPlayer = Players.LocalPlayer
 
@@ -108,3 +111,73 @@ task.spawn(function()
 		task.wait(0.5)
 	end
 end)
+
+-- -------------------------------------------------------------------------
+-- Toasts (Notify RemoteEvent)
+-- -------------------------------------------------------------------------
+local TOAST_LIFETIME = 3
+local MAX_TOASTS = 4
+
+local toastList = Instance.new("Frame")
+toastList.Name = "Toasts"
+toastList.Size = UDim2.new(0, 420, 0, 200)
+toastList.Position = UDim2.new(0.5, -210, 0, 70)
+toastList.BackgroundTransparency = 1
+toastList.Parent = screenGui
+
+local toastLayout = Instance.new("UIListLayout")
+toastLayout.SortOrder = Enum.SortOrder.LayoutOrder
+toastLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+toastLayout.Padding = UDim.new(0, 4)
+toastLayout.Parent = toastList
+
+local toastCounter = 0
+
+local function showToast(text)
+	if type(text) ~= "string" then
+		return
+	end
+	-- Drop the oldest toast when the stack is full
+	local existing = {}
+	for _, child in ipairs(toastList:GetChildren()) do
+		if child:IsA("TextLabel") then
+			table.insert(existing, child)
+		end
+	end
+	if #existing >= MAX_TOASTS then
+		table.sort(existing, function(a, b)
+			return a.LayoutOrder < b.LayoutOrder
+		end)
+		existing[1]:Destroy()
+	end
+
+	toastCounter = toastCounter + 1
+	local toast = Instance.new("TextLabel")
+	toast.LayoutOrder = toastCounter
+	toast.Size = UDim2.new(1, 0, 0, 30)
+	toast.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	toast.BackgroundTransparency = 0.35
+	toast.TextColor3 = Color3.fromRGB(255, 255, 255)
+	toast.TextScaled = true
+	toast.Font = Enum.Font.GothamBold
+	toast.Text = text
+	toast.Parent = toastList
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = toast
+
+	task.delay(TOAST_LIFETIME, function()
+		if not toast.Parent then
+			return
+		end
+		local fade =
+			TweenService:Create(toast, TweenInfo.new(0.4), { TextTransparency = 1, BackgroundTransparency = 1 })
+		fade:Play()
+		fade.Completed:Wait()
+		toast:Destroy()
+	end)
+end
+
+local Notify = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Events"):WaitForChild("Notify")
+Notify.OnClientEvent:Connect(showToast)

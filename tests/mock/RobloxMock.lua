@@ -404,6 +404,7 @@ local function makeService(name)
                 stores[key] = {
                     GetAsync = function(_self, k) return data[k] end,
                     SetAsync = function(_self, k, v) data[k] = v end,
+                    UpdateAsync = function(_self, k, fn) data[k] = fn(data[k]) end,
                     _data = data,
                 }
             end
@@ -415,6 +416,29 @@ local function makeService(name)
         local mockTween = { Play = function() end, Completed = { Wait = function() end } }
         function svc:Create(_inst, _info, _props)
             return mockTween
+        end
+
+    elseif name == "CollectionService" then
+        local tagged = {}   -- tag -> { instance, ... }
+        local added = {}    -- tag -> { handler, ... }
+        function svc:AddTag(inst, tag)
+            tagged[tag] = tagged[tag] or {}
+            table.insert(tagged[tag], inst)
+            for _, fn in ipairs(added[tag] or {}) do fn(inst) end
+        end
+        function svc:GetTagged(tag)
+            local copy = {}
+            for i, inst in ipairs(tagged[tag] or {}) do copy[i] = inst end
+            return copy
+        end
+        function svc:GetInstanceAddedSignal(tag)
+            return {
+                Connect = function(_self, fn)
+                    added[tag] = added[tag] or {}
+                    table.insert(added[tag], fn)
+                    return { Disconnect = function() end }
+                end,
+            }
         end
 
     elseif name == "Debris" then
@@ -574,6 +598,47 @@ end
 
 script.Parent = _sharedFolder
 _G._mockSharedFolder = _sharedFolder
+
+-- ---------------------------------------------------------------------------
+-- Sibling-module requires: `require(script.Parent.ToolUtil)`
+-- Indexing an unknown name on the mock script.Parent returns a module
+-- reference; the require shim below loads the matching source file.
+-- ---------------------------------------------------------------------------
+
+local MODULE_SEARCH_ROOTS = { "src/server/modules/", "src/shared/" }
+
+local function fileExists(path)
+    local f = io.open(path, "r")
+    if f then f:close() return true end
+    return false
+end
+
+setmetatable(_sharedFolder, {
+    __index = function(_t, name)
+        if type(name) ~= "string" then return nil end
+        for _, root in ipairs(MODULE_SEARCH_ROOTS) do
+            if fileExists(root .. name .. ".lua") then
+                return { _modulePath = (root .. name):gsub("/", ".") }
+            end
+        end
+        return nil
+    end,
+})
+
+local _luaRequire = require
+require = function(target)
+    if type(target) == "table" and target._modulePath then
+        return _luaRequire(target._modulePath)
+    end
+    return _luaRequire(target)
+end
+
+-- Roblox `typeof` — mock instances are plain tables
+typeof = function(v)
+    if type(v) == "table" and v.ClassName then return "Instance" end
+    if type(v) == "table" and getmetatable(v) == Vector3 then return "Vector3" end
+    return type(v)
+end
 
 -- ---------------------------------------------------------------------------
 -- Roblox globals not yet covered
