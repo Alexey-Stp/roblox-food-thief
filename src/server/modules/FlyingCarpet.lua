@@ -1,8 +1,19 @@
 -- FlyingCarpet.lua
--- Spawns a collectible flying carpet at night; removes it at dawn.
--- When a player picks it up they receive a "FlyingCarpet" Tool.
--- While equipped, FlyingCarpetClient.client.lua drives the flight via
--- AssemblyLinearVelocity; this module validates positions server-side.
+-- Single authority for flying carpets.
+--
+-- Two kinds of carpet, both created ONLY through FlyingCarpet.giveCarpet():
+--   • Night carpet — one world pickup spawns at night near the restaurant and
+--     is revoked at dawn. Ownership is tied to the Tool's lifetime: if the
+--     tool is destroyed (owner died, left, …) the world carpet respawns.
+--   • Bonus carpet — awarded by chests (ChestSystem, SkyHotel); kept by day.
+-- A player can hold at most one carpet of either kind.
+--
+-- Flight validation is server-authoritative: the server samples every
+-- carpet rider's HumanoidRootPart position on a fixed interval and
+-- rubber-bands horizontal speed above CARPET_MAX_SPEED_VALIDATE or climbs
+-- above CARPET_MAX_HEIGHT. Clients report nothing.
+-- Server teleports stamp the Player attribute "LastServerTeleport"
+-- (see ToolUtil.teleport) so they reset the baseline instead of tripping it.
 --
 -- Night detection: polls Lighting.ClockTime every second.
 -- Night = ClockTime >= 20  OR  ClockTime < 6
@@ -10,18 +21,23 @@
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 
+local ToolUtil = require(script.Parent.ToolUtil)
+
 local FlyingCarpet = {}
 
 local Config = nil
 local RemoteEvents = nil
 
 -- Module state
-local carpetPart = nil -- world Part while carpet is on the ground
-local carpetOwner = nil -- Player who currently holds the carpet Tool
+local carpetPart = nil -- world Part while the night carpet is on the ground
+local nightCarpetTool = nil -- the night carpet Tool while someone holds it
+local nightCarpetOwner = nil
 
--- Per-owner server-side position validation
--- carpetValidation[userId] = { lastPos, lastTime }
-local carpetValidation = {}
+-- Per-player validation samples: [Player] = { pos, time, teleportStamp }
+local samples = {}
+
+-- Forward declaration (buildCarpetPart ↔ tool-destroy respawn)
+local spawnWorldCarpet
 
 -- -------------------------------------------------------------------------
 -- Helpers
@@ -31,33 +47,7 @@ local function isNight()
 	return t >= 20 or t < 6
 end
 
-local function isProtectedTool(item)
-	if not item or not item:IsA("Tool") then
-		return true
-	end
-	local h = item:FindFirstChild("Handle")
-	return h and h:GetAttribute("IsCarpet") == true
-end
-
--- -------------------------------------------------------------------------
--- Carpet world Part construction
--- -------------------------------------------------------------------------
-local function buildCarpetPart()
-	local pos = Config.CARPET_SPAWN_POS
-
-	-- Main flat rug
-	local part = Instance.new("Part")
-	part.Name = "FlyingCarpet_World"
-	part.Size = Vector3.new(6, 0.3, 4)
-	part.BrickColor = BrickColor.new("Bright red")
-	part.Material = Enum.Material.Fabric
-	part.Position = pos
-	part.Anchored = true
-	part.CFrame = CFrame.new(pos)
-	part.Parent = workspace
-
-	-- Decorative neon border strips
-	local borderColor = BrickColor.new("Bright yellow")
+local function addBorderStrips(parentPart, container, anchoredStrips)
 	local borders = {
 		{ size = Vector3.new(6, 0.3, 0.3), offset = Vector3.new(0, 0, 1.85) },
 		{ size = Vector3.new(6, 0.3, 0.3), offset = Vector3.new(0, 0, -1.85) },
@@ -66,27 +56,105 @@ local function buildCarpetPart()
 	}
 	for _, b in ipairs(borders) do
 		local strip = Instance.new("Part")
+		strip.Name = "CarpetBorder"
 		strip.Size = b.size
-		strip.BrickColor = borderColor
+		strip.BrickColor = BrickColor.new("Bright yellow")
 		strip.Material = Enum.Material.Neon
-		strip.Anchored = true
+		strip.Anchored = anchoredStrips
 		strip.CanCollide = false
-		strip.CFrame = part.CFrame * CFrame.new(b.offset)
-		strip.Parent = workspace
-		-- Weld to main part so they move together if CFrame changes
+		strip.Massless = true
+		strip.CFrame = parentPart.CFrame * CFrame.new(b.offset)
+		strip.Parent = container
 		local w = Instance.new("WeldConstraint")
-		w.Part0, w.Part1 = part, strip
-		w.Parent = part
+		w.Part0, w.Part1 = parentPart, strip
+		w.Parent = parentPart
+	end
+end
+
+local function buildCarpetTool(isNightCarpet)
+	local tool = Instance.new("Tool")
+	tool.Name = "FlyingCarpet"
+	tool.RequiresHandle = true
+	tool.ToolTip = isNightCarpet and "A magical flying carpet! Vanishes at dawn." or "A magical flying carpet!"
+
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(6, 0.3, 4)
+	handle.BrickColor = BrickColor.new("Bright red")
+	handle.Material = Enum.Material.Fabric
+	handle.CanCollide = false
+	-- Tags: protected from confiscation; flight tuning read by FlyingCarpetClient
+	handle:SetAttribute("IsCarpet", true)
+	handle:SetAttribute("NightCarpet", isNightCarpet)
+	handle:SetAttribute("FlightSpeed", Config.CARPET_FLIGHT_SPEED)
+	handle:SetAttribute("AscentSpeed", Config.CARPET_ASCENT_SPEED)
+	handle:SetAttribute("MaxHeight", Config.CARPET_MAX_HEIGHT)
+	handle.Parent = tool
+
+	addBorderStrips(handle, tool, false)
+	return tool
+end
+
+local function releaseNightCarpet()
+	nightCarpetTool = nil
+	nightCarpetOwner = nil
+	-- Owner lost the carpet (death, leave, …) — let someone else have it tonight
+	if isNight() and not carpetPart then
+		task.delay(2, function()
+			if isNight() and not carpetPart and not nightCarpetTool then
+				spawnWorldCarpet()
+			end
+		end)
+	end
+end
+
+-- -------------------------------------------------------------------------
+-- Public: grant a carpet. Returns true when a carpet was given.
+-- -------------------------------------------------------------------------
+function FlyingCarpet.giveCarpet(player, isNightCarpet)
+	if ToolUtil.hasCarpet(player) then
+		return false
+	end
+	if isNightCarpet and nightCarpetTool then
+		return false
 	end
 
-	-- PointLight so it glows at night
+	local tool = buildCarpetTool(isNightCarpet == true)
+	if isNightCarpet then
+		nightCarpetTool = tool
+		nightCarpetOwner = player
+		tool.Destroying:Connect(function()
+			if nightCarpetTool == tool then
+				releaseNightCarpet()
+			end
+		end)
+	end
+	tool.Parent = player.Backpack
+	return true
+end
+
+-- -------------------------------------------------------------------------
+-- Night world carpet
+-- -------------------------------------------------------------------------
+spawnWorldCarpet = function()
+	local pos = Config.CARPET_SPAWN_POS
+
+	local part = Instance.new("Part")
+	part.Name = "FlyingCarpet_World"
+	part.Size = Vector3.new(6, 0.3, 4)
+	part.BrickColor = BrickColor.new("Bright red")
+	part.Material = Enum.Material.Fabric
+	part.Anchored = true
+	part.CFrame = CFrame.new(pos)
+	part.Parent = workspace
+	addBorderStrips(part, part, true)
+
 	local light = Instance.new("PointLight")
 	light.Brightness = 2
 	light.Range = 15
 	light.Color = Color3.fromRGB(255, 200, 80)
 	light.Parent = part
 
-	-- ProximityPrompt to pick up
 	local pp = Instance.new("ProximityPrompt")
 	pp.ActionText = "Grab Carpet"
 	pp.ObjectText = "Flying Carpet"
@@ -96,155 +164,105 @@ local function buildCarpetPart()
 	pp.Parent = part
 
 	pp.Triggered:Connect(function(player)
-		-- Only one player can own the carpet at a time
-		if carpetOwner then
+		if carpetPart ~= part then
 			return
 		end
-		pp.Enabled = false
-		giveCarpetTool(player)
-		if carpetPart and carpetPart.Parent then
-			carpetPart:Destroy()
+		if not FlyingCarpet.giveCarpet(player, true) then
+			RemoteEvents.Notify:FireClient(player, "You already have a carpet")
+			return
 		end
 		carpetPart = nil
+		part:Destroy()
 	end)
 
-	return part
+	carpetPart = part
+	RemoteEvents.CarpetSpawned:FireAllClients()
 end
 
--- -------------------------------------------------------------------------
--- Flying carpet Tool given to the player on pickup
--- -------------------------------------------------------------------------
-function giveCarpetTool(player)
-	carpetOwner = player
-
-	local tool = Instance.new("Tool")
-	tool.Name = "FlyingCarpet"
-	tool.RequiresHandle = true
-	tool.ToolTip = "A magical flying carpet!"
-
-	local handle = Instance.new("Part")
-	handle.Name = "Handle"
-	handle.Size = Vector3.new(6, 0.3, 4)
-	handle.BrickColor = BrickColor.new("Bright red")
-	handle.Material = Enum.Material.Fabric
-	handle.CanCollide = false
-	-- Tag so EnemyAI / guards do not confiscate it
-	handle:SetAttribute("IsCarpet", true)
-	handle.Parent = tool
-
-	-- Neon border strips on handle too
-	for _, b in ipairs({
-		{ size = Vector3.new(6, 0.3, 0.3), offset = Vector3.new(0, 0, 1.85) },
-		{ size = Vector3.new(6, 0.3, 0.3), offset = Vector3.new(0, 0, -1.85) },
-		{ size = Vector3.new(0.3, 0.3, 4), offset = Vector3.new(2.85, 0, 0) },
-		{ size = Vector3.new(0.3, 0.3, 4), offset = Vector3.new(-2.85, 0, 0) },
-	}) do
-		local strip = Instance.new("Part")
-		strip.Size = b.size
-		strip.BrickColor = BrickColor.new("Bright yellow")
-		strip.Material = Enum.Material.Neon
-		strip.CanCollide = false
-		strip.CFrame = CFrame.new(b.offset)
-		strip.Parent = tool
-		local w = Instance.new("WeldConstraint")
-		w.Part0, w.Part1 = handle, strip
-		w.Parent = handle
-	end
-
-	tool.Parent = player.Backpack
-
-	-- Seed validation state
-	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	carpetValidation[player.UserId] = {
-		lastPos = hrp and hrp.Position or Vector3.zero,
-		lastTime = tick(),
-	}
-end
-
--- -------------------------------------------------------------------------
--- Strip carpet from a player (called at dawn)
--- -------------------------------------------------------------------------
-local function stripCarpetFromPlayer(player)
-	local char = player.Character
-	if char then
-		local eq = char:FindFirstChildOfClass("Tool")
-		if eq and eq.Name == "FlyingCarpet" then
-			eq:Destroy()
+local function despawnNightCarpet()
+	if nightCarpetTool then
+		local owner = nightCarpetOwner
+		local tool = nightCarpetTool
+		nightCarpetTool = nil -- prevent the Destroying handler from respawning it
+		nightCarpetOwner = nil
+		tool:Destroy()
+		if owner and owner.Parent then
+			RemoteEvents.CarpetRevoked:FireClient(owner)
 		end
 	end
-	for _, item in ipairs(player.Backpack:GetChildren()) do
-		if item.Name == "FlyingCarpet" then
-			item:Destroy()
-		end
-	end
-	carpetValidation[player.UserId] = nil
-end
-
--- -------------------------------------------------------------------------
--- Despawn carpet (called at dawn)
--- -------------------------------------------------------------------------
-local function despawnCarpet()
-	if carpetOwner then
-		stripCarpetFromPlayer(carpetOwner)
-		RemoteEvents.CarpetRevoked:FireClient(carpetOwner)
-		carpetOwner = nil
-	end
-	if carpetPart and carpetPart.Parent then
+	if carpetPart then
 		carpetPart:Destroy()
 		carpetPart = nil
 	end
 end
 
 -- -------------------------------------------------------------------------
--- Server position validation handler
+-- Server-side flight validation
 -- -------------------------------------------------------------------------
-local function onPositionUpdate(player, newPos)
-	if player ~= carpetOwner then
-		return
+local function ridingCarpet(char)
+	for _, item in ipairs(char:GetChildren()) do
+		if ToolUtil.isCarpet(item) then
+			return true
+		end
 	end
-	if typeof(newPos) ~= "Vector3" then
+	return false
+end
+
+local function validatePlayer(player, now)
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp or not ridingCarpet(char) then
+		samples[player] = nil
 		return
 	end
 
-	local data = carpetValidation[player.UserId]
-	if not data then
+	local pos = hrp.Position
+	local teleportStamp = player:GetAttribute("LastServerTeleport")
+	local sample = samples[player]
+
+	-- New rider or server teleport since the last sample: reset the baseline
+	if not sample or sample.teleportStamp ~= teleportStamp then
+		samples[player] = { pos = pos, time = now, teleportStamp = teleportStamp }
 		return
 	end
 
-	local now = tick()
-	local dt = now - data.lastTime
-	if dt < 0.05 then
+	local dt = now - sample.time
+	if dt <= 0 then
 		return
-	end -- rate-limit: ignore updates faster than 20 Hz
+	end
 
-	-- Speed validation
-	local dist = (newPos - data.lastPos).Magnitude
-	if dt > 0 and (dist / dt) > Config.CARPET_MAX_SPEED_VALIDATE then
-		-- Rubber-band back to last known valid position
-		local char = player.Character
-		if char then
-			local hrp = char:FindFirstChild("HumanoidRootPart")
-			if hrp then
-				hrp.CFrame = CFrame.new(data.lastPos)
+	local horizontal = Vector3.new(pos.X - sample.pos.X, 0, pos.Z - sample.pos.Z).Magnitude
+	if horizontal / dt > Config.CARPET_MAX_SPEED_VALIDATE then
+		-- Rubber-band to the last valid position
+		hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+		hrp.CFrame = CFrame.new(sample.pos)
+		sample.time = now
+		return
+	end
+
+	-- Height cap only applies to climbing (players may ride at the Sky Hotel)
+	local cap = Config.CARPET_MAX_HEIGHT + 5
+	if pos.Y > cap and pos.Y > sample.pos.Y + 1 then
+		local clampedY = math.max(sample.pos.Y, Config.CARPET_MAX_HEIGHT)
+		hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+		hrp.CFrame = CFrame.new(pos.X, clampedY, pos.Z)
+		pos = Vector3.new(pos.X, clampedY, pos.Z)
+	end
+
+	sample.pos = pos
+	sample.time = now
+end
+
+local function startValidator()
+	task.spawn(function()
+		while true do
+			task.wait(Config.CARPET_VALIDATE_INTERVAL)
+			local now = os.clock()
+			for _, player in ipairs(Players:GetPlayers()) do
+				validatePlayer(player, now)
 			end
 		end
-		return
-	end
-
-	-- Height cap
-	if newPos.Y > Config.CARPET_MAX_HEIGHT + 5 then
-		local char = player.Character
-		if char then
-			local hrp = char:FindFirstChild("HumanoidRootPart")
-			if hrp then
-				hrp.CFrame = CFrame.new(newPos.X, Config.CARPET_MAX_HEIGHT, newPos.Z)
-			end
-		end
-		return
-	end
-
-	data.lastPos = newPos
-	data.lastTime = now
+	end)
 end
 
 -- -------------------------------------------------------------------------
@@ -252,24 +270,21 @@ end
 -- -------------------------------------------------------------------------
 local function startNightWatcher()
 	local wasNight = isNight()
+	if wasNight then
+		spawnWorldCarpet()
+	end
 
 	task.spawn(function()
 		while true do
 			task.wait(1)
 			local nowNight = isNight()
-
 			if nowNight and not wasNight then
-				-- Became night: spawn carpet
-				if not carpetPart and not carpetOwner then
-					carpetPart = buildCarpetPart()
-					-- Notify all clients so they can show a hint
-					RemoteEvents.CarpetSpawned:FireAllClients()
+				if not carpetPart and not nightCarpetTool then
+					spawnWorldCarpet()
 				end
 			elseif not nowNight and wasNight then
-				-- Became day: remove carpet
-				despawnCarpet()
+				despawnNightCarpet()
 			end
-
 			wasNight = nowNight
 		end
 	end)
@@ -283,26 +298,19 @@ function FlyingCarpet.init(remoteEvents, config)
 	RemoteEvents = remoteEvents
 	Config = config
 
-	remoteEvents.CarpetPositionUpdate.OnServerEvent:Connect(onPositionUpdate)
-
 	Players.PlayerRemoving:Connect(function(player)
-		if player == carpetOwner then
-			carpetOwner = nil
-			carpetValidation[player.UserId] = nil
-			-- Respawn carpet so other players can still get it
-			if isNight() and not carpetPart then
-				task.delay(2, function()
-					if isNight() and not carpetOwner and not carpetPart then
-						carpetPart = buildCarpetPart()
-					end
-				end)
-			end
+		samples[player] = nil
+		-- The owner's Backpack is destroyed with the player, which fires the
+		-- tool's Destroying handler; this is a fallback in case it was not.
+		if player == nightCarpetOwner then
+			releaseNightCarpet()
 		end
 	end)
 end
 
 function FlyingCarpet.start()
 	startNightWatcher()
+	startValidator()
 end
 
 return FlyingCarpet

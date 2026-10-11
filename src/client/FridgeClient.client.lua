@@ -1,18 +1,17 @@
 -- FridgeClient.client.lua  (LocalScript in StarterPlayerScripts)
--- Handles client-side fridge interactions:
---   • Q key with nearest player in range → fires GiveFood to server
---   • G key → fires DropFood to server
---   • StoreFoodInFridge / UpgradeFridge are triggered via ProximityPrompts on
---     the fridge Parts (handled here via PromptTriggered or fired directly).
---   • FridgeStoredFeedback → shows a price breakdown popup for 3 seconds.
+-- Client-side food / fridge helpers:
+--   • F key → give food to the nearest player in range (fires GiveFood)
+--   • G key → drop food (fires DropFood)
+--   • FridgeStoredFeedback → shows a price breakdown popup for 3 seconds
+--   • Per-player fridge display: fridge levels are per player, so this script
+--     rewrites the fridge prompts / billboard locally from the Player
+--     attributes FridgeLevel, FridgeBonusPct, FridgeNextCost, FridgeMaxLevel.
 --
--- Note: The actual ProximityPrompts for fridge interaction are added by
--- RefrigeratorSystem.lua on the server. This script only handles:
---   1. The G-key drop shortcut
---   2. The E-on-nearby-player give shortcut
---   3. The FridgeStoredFeedback price popup
+-- The Store / Upgrade ProximityPrompts themselves are created and handled
+-- entirely on the server by RefrigeratorSystem.lua.
 
 local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,8 +25,8 @@ local DropFood = eventsFolder:WaitForChild("DropFood")
 local FridgeStoredFeedback = eventsFolder:WaitForChild("FridgeStoredFeedback")
 
 -- Debounce to avoid double-firing
-local lastGive = 0
-local lastDrop = 0
+local lastGive = -math.huge
+local lastDrop = -math.huge
 
 -- -------------------------------------------------------------------------
 -- Find the nearest player within give range (12 studs)
@@ -160,7 +159,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 
 	-- G key → drop equipped food
 	if input.KeyCode == Enum.KeyCode.G then
-		local now = tick()
+		local now = os.clock()
 		if now - lastDrop < 0.5 then
 			return
 		end
@@ -169,7 +168,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 
 	-- F key → give food to nearest player
 	elseif input.KeyCode == Enum.KeyCode.F then
-		local now = tick()
+		local now = os.clock()
 		if now - lastGive < 0.5 then
 			return
 		end
@@ -187,3 +186,57 @@ end)
 FridgeStoredFeedback.OnClientEvent:Connect(function(foodName, basePrice, bonusAmt, finalPrice)
 	showFeedbackPopup(foodName, basePrice, bonusAmt, finalPrice)
 end)
+
+-- -------------------------------------------------------------------------
+-- Per-player fridge display (prompt + billboard text are changed locally)
+-- -------------------------------------------------------------------------
+local function refreshFridge(fridgePart)
+	local level = localPlayer:GetAttribute("FridgeLevel") or 1
+	local maxLevel = localPlayer:GetAttribute("FridgeMaxLevel") or level
+	local bonusPct = localPlayer:GetAttribute("FridgeBonusPct") or 0
+	local nextCost = localPlayer:GetAttribute("FridgeNextCost")
+
+	local storePrompt = fridgePart:FindFirstChild("StorePrompt")
+	if storePrompt then
+		storePrompt.ObjectText = "Your Fridge (Lv " .. level .. ")"
+		storePrompt.ActionText = "Store Food (+" .. bonusPct .. "%)"
+	end
+
+	local upgradePrompt = fridgePart:FindFirstChild("UpgradePrompt")
+	if upgradePrompt then
+		upgradePrompt.ObjectText = "Your Fridge (Lv " .. level .. ")"
+		upgradePrompt.Enabled = nextCost ~= nil
+		if nextCost then
+			upgradePrompt.ActionText = "Upgrade to Lv " .. (level + 1) .. " ($" .. nextCost .. ")"
+		end
+	end
+
+	local bb = fridgePart:FindFirstChild("FridgeBB")
+	local info = bb and bb:FindFirstChild("Info")
+	if info then
+		info.Text = "Your fridge: Lv "
+			.. level
+			.. " / "
+			.. maxLevel
+			.. "  ·  +"
+			.. bonusPct
+			.. "%"
+			.. (nextCost and ("  ·  next $" .. nextCost) or "  ·  MAX")
+	end
+end
+
+local function refreshAllFridges()
+	for _, fridgePart in ipairs(CollectionService:GetTagged("Fridge")) do
+		refreshFridge(fridgePart)
+	end
+end
+
+CollectionService:GetInstanceAddedSignal("Fridge"):Connect(function(fridgePart)
+	-- Prompts are added by the server right after tagging
+	task.wait(1)
+	refreshFridge(fridgePart)
+end)
+for _, attr in ipairs({ "FridgeLevel", "FridgeBonusPct", "FridgeNextCost", "FridgeMaxLevel" }) do
+	localPlayer:GetAttributeChangedSignal(attr):Connect(refreshAllFridges)
+end
+refreshAllFridges()

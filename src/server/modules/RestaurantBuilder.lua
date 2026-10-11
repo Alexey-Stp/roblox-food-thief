@@ -370,13 +370,13 @@ local function createHotelDoor(position, rotation, parent, doorName, debounceTim
 	prompt.Parent = door
 
 	local doorOpen = false
-	doorCooldowns[door] = 0
+	doorCooldowns[door] = -math.huge
 	door.Destroying:Connect(function()
 		doorCooldowns[door] = nil
 	end)
 
 	prompt.Triggered:Connect(function()
-		local now = tick()
+		local now = os.clock()
 		if now - doorCooldowns[door] < debounceTime then
 			return
 		end
@@ -413,13 +413,13 @@ local function createFloorDoor(position, rotation, parent, doorName, debounceTim
 	prompt.Parent = door
 
 	local doorOpen = false
-	doorCooldowns[door] = 0
+	doorCooldowns[door] = -math.huge
 	door.Destroying:Connect(function()
 		doorCooldowns[door] = nil
 	end)
 
 	prompt.Triggered:Connect(function()
-		local now = tick()
+		local now = os.clock()
 		if now - doorCooldowns[door] < debounceTime then
 			return
 		end
@@ -465,7 +465,7 @@ local function buildWindowRow(parent, wallCenterX, wallCenterZ, wallLength, wind
 end
 
 -- -------------------------------------------------------------------------
--- Lift system: TweenService Platform moving between two floors
+-- Lift system: physics platform moving between two floors
 -- side: "east" (F1↔F2) or "west" (F2↔F3)
 -- -------------------------------------------------------------------------
 local function buildLift(parent, Config, side)
@@ -503,19 +503,61 @@ local function buildLift(parent, Config, side)
 		w.Parent = parent
 	end
 
-	-- Moving platform
+	-- Moving platform: unanchored and driven by a servo PrismaticConstraint,
+	-- so the physics engine carries passengers (no server CFrame writes on
+	-- client-owned characters, which caused rubber-banding).
 	local platform = Instance.new("Part")
 	platform.Name = "LiftPlatform_" .. side
 	platform.Size = Vector3.new(shaftSize - 1, 1, shaftSize - 1)
 	platform.Position = Vector3.new(liftX, yLow + 0.5, liftZ)
-	platform.Anchored = true
+	platform.Anchored = false
 	platform.BrickColor = BrickColor.new("Dark grey")
 	platform.Material = Enum.Material.SmoothPlastic
 	platform.Parent = parent
 
+	-- Invisible anchored base the platform slides along (vertical axis)
+	local liftBase = Instance.new("Part")
+	liftBase.Name = "LiftBase_" .. side
+	liftBase.Size = Vector3.new(1, 1, 1)
+	liftBase.Position = Vector3.new(liftX, yLow + 0.5, liftZ)
+	liftBase.Anchored = true
+	liftBase.CanCollide = false
+	liftBase.Transparency = 1
+	liftBase.Parent = parent
+
+	local baseAttachment = Instance.new("Attachment")
+	baseAttachment.Axis = Vector3.new(0, 1, 0)
+	baseAttachment.SecondaryAxis = Vector3.new(1, 0, 0)
+	baseAttachment.Parent = liftBase
+
+	local platformAttachment = Instance.new("Attachment")
+	platformAttachment.Axis = Vector3.new(0, 1, 0)
+	platformAttachment.SecondaryAxis = Vector3.new(1, 0, 0)
+	platformAttachment.Parent = platform
+
+	local travel = yHigh - yLow
+	local liftDuration = 2 -- seconds per trip
+	local servo = Instance.new("PrismaticConstraint")
+	servo.Name = "LiftServo"
+	servo.Attachment0 = baseAttachment
+	servo.Attachment1 = platformAttachment
+	servo.ActuatorType = Enum.ActuatorType.Servo
+	servo.ServoMaxForce = math.huge
+	servo.Speed = travel / liftDuration
+	servo.LimitsEnabled = true
+	servo.LowerLimit = 0
+	servo.UpperLimit = travel
+	servo.TargetPosition = 0
+	servo.Parent = platform
+
+	-- Server simulates the lift so no client can own (and teleport) it
+	pcall(function()
+		platform:SetNetworkOwner(nil)
+	end)
+
 	addLabel(platform, Enum.NormalId.Top, side == "east" and "LIFT F1 ↔ F2" or "LIFT F2 ↔ F3", Color3.new(1, 1, 0))
 
-	liftCooldowns[platform] = 0
+	liftCooldowns[platform] = -math.huge
 	platform.Destroying:Connect(function()
 		liftCooldowns[platform] = nil
 	end)
@@ -530,60 +572,21 @@ local function buildLift(parent, Config, side)
 	local isAtBottom = true
 	local isMoving = false
 
-	-- Shared move logic: moves the platform to the target Y position.
-	-- Uses a manual step loop instead of TweenService so that players
-	-- standing on the platform are co-moved each frame (TweenService on
-	-- an Anchored part does NOT carry passengers).
+	-- Shared move logic: sets the servo target; physics moves platform + riders.
 	local function moveLift(targetIsBottom)
 		if isMoving then
 			return
 		end
-		local now = tick()
+		local now = os.clock()
 		if now - liftCooldowns[platform] < Config.LIFT_DEBOUNCE then
 			return
 		end
 		liftCooldowns[platform] = now
 		isMoving = true
 
-		local targetY = targetIsBottom and (yLow + 0.5) or (yHigh + 0.5)
-		local startY = platform.Position.Y
-		local duration = 2 -- seconds (same feel as before)
-		local elapsed = 0
-		local STEP = 0.05 -- 20 Hz update
+		servo.TargetPosition = targetIsBottom and 0 or travel
 
-		task.spawn(function()
-			while elapsed < duration do
-				task.wait(STEP)
-				elapsed = math.min(elapsed + STEP, duration)
-				local t = elapsed / duration
-				local newY = startY + (targetY - startY) * t
-				local delta = newY - platform.Position.Y
-				platform.Position = Vector3.new(liftX, newY, liftZ)
-
-				-- Co-move any players standing on the platform
-				for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
-					local char = plr.Character
-					if char then
-						local hrp = char:FindFirstChild("HumanoidRootPart")
-						if hrp then
-							local rel = hrp.Position - platform.Position
-							-- Player is "on" the platform when within the shaft
-							-- XZ footprint and within 0–6 studs above the surface.
-							if
-								math.abs(rel.X) < (shaftSize / 2 - 1)
-								and math.abs(rel.Z) < (shaftSize / 2 - 1)
-								and rel.Y >= 0
-								and rel.Y < 6
-							then
-								hrp.CFrame = hrp.CFrame + Vector3.new(0, delta, 0)
-							end
-						end
-					end
-				end
-			end
-
-			-- Final snap to exact position
-			platform.Position = Vector3.new(liftX, targetY, liftZ)
+		task.delay(liftDuration, function()
 			isAtBottom = targetIsBottom
 			isMoving = false
 			if side == "east" then
@@ -1344,8 +1347,7 @@ function RestaurantBuilder.build(Config)
 	buildRiver(hotel, Config)
 	buildHills(hotel, Config)
 
-	-- Trees: ring around hotel + scattered across the wider map
-	buildRestaurantTrees(hotel, Config)
+	-- Trees scattered across the wider map (the ring around the hotel is built above)
 	buildWorldTrees(hotel, Config)
 
 	return hotel, floorFoodPositions

@@ -262,6 +262,39 @@ describe("FoodSystem", function()
             assert.is_nil(part.Parent)
         end)
 
+        it("refuses to steal when the player is at MAX_FOOD_CARRIED", function()
+            local FS = loadFoodSystem()
+            FS.init(mockRemoteEvents, mockGameSystems, { MAX_FOOD_CARRIED = 1, FOOD_RESPAWN_TIME = 5 })
+            local ft = makeFoodType()
+            FS.spawnAll({ { { foodType = ft, position = Vector3.new(0, 5, 0) } } })
+
+            local player = makePlayer()
+            local held = Instance.new("Tool")
+            local handle = Instance.new("Part")
+            handle.Name = "Handle"
+            handle:SetAttribute("IsFood", true)
+            handle.Parent = held
+            held.Parent = player.Backpack
+
+            local part   = findPartInWorkspace("TestFood")
+            local prompt = findChildByClass(part, "ProximityPrompt")
+            prompt.Triggered._fire(prompt.Triggered, player)
+
+            assert.equals(1, #player.Backpack._children)
+            assert.equals(0, mockGameSystems._stolenCalls)
+            assert.not_nil(part.Parent, "food should stay on the table")
+        end)
+
+        it("stolen tool is tagged IsFood with sell metadata", function()
+            local player = makePlayer()
+            setupAndTrigger(player)
+            local tool = player.Backpack._children[1]
+            local handle = findChildByClass(tool, "Part")
+            assert.is_true(handle:GetAttribute("IsFood"))
+            assert.equals(10, handle:GetAttribute("BaseSellPrice"))
+            assert.equals(10, handle:GetAttribute("CurrentSellPrice"))
+        end)
+
         it("does not error when init was not called (no RemoteEvents/GameSystems)", function()
             local FS = loadFoodSystem()
             -- No FS.init() call — RemoteEvents and GameSystems are nil

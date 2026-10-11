@@ -1,182 +1,100 @@
-# Grand Hotel Heist — Developer Guide
+# CLAUDE.md
 
-## Game Concept
-A cooperative PvE heist game set in a grand hotel. Players sneak into the hotel, steal food from 3 floors of increasingly dangerous creatures, evade Hunter Guards, and bring stolen food back to their **Safe Base** to sell or store.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-### Core Loop
-1. Enter the hotel → steal food from tables (press **E**)
-2. Evade floor creatures (Wolves → Bears → Occultists) and Hunter Guards (blue-uniform NPCs)
-3. Fight back with the **Bat** (always in backpack) — server-validated, 0.8 s cooldown
-4. Return to base → sell food at the Market Stall for Money
-5. Store food in a **Fridge** (upgrades level 1–10 with Money) to boost its sell value
-6. Give food to teammates (**F** key near player) or drop it (**G** key) for coordination
-7. At night: grab the **Flying Carpet** near the restaurant entrance to fly over walls
-8. Watch the sky — **Airplanes** occasionally fly over and drop free food
-9. Scores and money persist between sessions via DataStore
+# Grand Hotel Heist
 
----
+A cooperative PvE Roblox heist game. Players steal food from 3 hotel floors (Wolves → Bears → Occultists), evade Hunter Guards, and bring the food back to a Safe Base to sell for Money or store in an upgradeable Fridge. Written in Luau and synced into Studio with Rojo. Gameplay details and controls are in [README.md](README.md).
 
-## Project Structure
+## Commands
 
-```
-roblox_food_thief/
-├── default.project.json          Rojo project manifest
-├── CLAUDE.md                     This file
-└── src/
-    ├── server/
-    │   ├── Main.server.lua             Entry point — wires all modules together
-    │   └── modules/
-    │       ├── Config.lua              All constants, food types, asset IDs
-    │       ├── GameSystems.lua         Leaderstats + DataStore persistence
-    │       ├── RestaurantBuilder.lua   Hotel construction (floors, lifts, doors, exterior staircase)
-    │       ├── FoodSystem.lua          Food spawning, stealing, respawning
-    │       ├── EnemyAI.lua             Creature patrol + chase AI
-    │       ├── BaseBuilder.lua         Safe base, fridges, shop, sell stand
-    │       ├── DayNight.lua            Day/night cycle & lighting presets
-    │       ├── BatCombat.lua           Server-validated bat PvP weapon
-    │       ├── FoodInventory.lua       Food give & drop between players
-    │       ├── RefrigeratorSystem.lua  Fridge levelling & sell-value bonus
-    │       ├── FlyingCarpet.lua        Night carpet spawn + server flight validation
-    │       ├── AirplaneSystem.lua      Fly-by airplanes with food drops
-    │       └── HunterAI.lua            Guard NPCs with pathfinding & catch logic
-    ├── client/
-    │   ├── Effects.client.lua          Hit flash, sparkle FX, bat hit sound
-    │   ├── FlyingCarpetClient.client.lua  Carpet flight input (WASD + Space/Shift)
-    │   ├── FridgeClient.client.lua     Fridge UI, give/drop key bindings
-    │   ├── Hud.client.lua              Heads-up display
-    │   └── DayNightUI.client.lua       Day/night indicator
-    └── shared/
-        └── RemoteEvents.lua            Centralised RemoteEvent instances
+The Windows binaries `rojo.exe` and `stylua.exe` sit in the repo root. CI pins Rojo 7.4.4, Selene 0.27.1 and StyLua 0.20.0.
+
+```bash
+./rojo.exe serve default.project.json            # live-sync to Studio (Rojo plugin → Connect → Play)
+./rojo.exe build default.project.json -o game.rbxl   # build place file (CI "build" job)
+
+selene generate-roblox-std   # one-time: generates roblox.yml for std = "roblox"
+selene src/                  # lint (CI "lint" job)
+./stylua.exe --check src/    # format check (CI "format" job); drop --check to apply
+./stylua.exe src/
+
+busted                                      # run all specs (LuaJIT + busted, from repo root)
+busted tests/spec/FoodSystem_spec.lua       # run one spec file
+busted --filter "steal" tests/spec          # run tests whose names match a pattern
 ```
 
-### Roblox Service Mapping (Rojo)
-| Folder | Roblox Service |
-|--------|----------------|
+CI ([.github/workflows/pr-checks.yml](.github/workflows/pr-checks.yml)) runs build, lint, format and test on every PR and on every push to a non-`main` branch. A push to `main` builds and publishes the place to Roblox through the Open Cloud API ([publish.yml](.github/workflows/publish.yml)).
+
+StyLua uses **tabs** ([.stylua.toml](.stylua.toml)) and only checks `src/`. Specs under `tests/` use spaces and are not format-checked.
+
+## Testing outside Studio
+
+Tests run under plain LuaJIT, not Roblox. `.busted` loads [tests/mock/RobloxMock.lua](tests/mock/RobloxMock.lua) as a helper. The helper:
+- sets up mock Roblox globals and services (`Vector3`, `BrickColor`, `Instance`, `game:GetService`, `task`, and so on)
+- adds `./?.lua` to `package.path`, so specs load modules by file path: `require("src.server.modules.Config")`
+- provides reset helpers such as `resetWorkspace()`
+
+Specs reload a module with fresh state by clearing `package.loaded["src.server.modules.X"] = nil` before calling `require` again. If a module uses a Roblox API the mock doesn't cover, extend `RobloxMock.lua` and leave the module unchanged. The mock also resolves sibling requires such as `require(script.Parent.ToolUtil)`: indexing an unknown name on the mock `script.Parent` returns a reference to `src/server/modules/<Name>.lua` or `src/shared/<Name>.lua`. Mock instances don't resolve children by indexing, so code uses `FindFirstChild("Handle")` and not `tool.Handle`. Specs that test cooldowns replace `os.clock` with a fake clock and restore it in `after_each`. Selene lints specs with [tests/selene.toml](tests/selene.toml), which uses `lua51+busted` as defined in [selene.toml](selene.toml) at the root. The root [selene.toml](selene.toml) applies `std = "roblox"` to `src/`.
+
+## Architecture
+
+**Rojo mapping** ([default.project.json](default.project.json)):
+
+| Folder | Roblox location |
+|--------|-----------------|
 | `src/server/` | `ServerScriptService/GameServer` |
 | `src/client/` | `StarterPlayer/StarterPlayerScripts/GameClient` |
 | `src/shared/` | `ReplicatedStorage/Shared` |
+| `src/world/` | `Workspace` (imported `.rbxmx` buildings and models; `WorldPopulation` positions them at runtime) |
 
----
+**Server boot order.** [Main.server.lua](src/server/Main.server.lua) is the only server Script. Every system is a ModuleScript in `src/server/modules/` and has no top-level side effects. Main wires them in three phases:
+1. `X.init(deps...)`: pass in dependencies such as `RemoteEvents`, `Config` and `GameSystems`, and connect remote handlers. `GameSystems.init` runs first because players may already be in the server.
+2. Build the world: `RestaurantBuilder.build(Config)` returns the per-floor food positions, which then go to `FoodSystem.spawnAll`. After that come `BaseBuilder.build()`, `SkyHotel.build()`, the creature/guard/chest `spawnAll()` calls, and the per-floor `EnemyAI.spawn` loop.
+3. Start the loops: `DayNight.start`, `AirplaneSystem.start` and `FlyingCarpet.start`.
 
-## Development Workflow
+`RefrigeratorSystem.registerFridges()` runs right after `BaseBuilder.build()`. Anything that decorates built objects must be called explicitly after the build, not deferred.
 
-### Prerequisites
-- [Rojo](https://rojo.space) — file-system sync tool for Roblox Studio
-- Roblox Studio with the **Rojo plugin** installed
+To add a new system, require it with `safeRequire` and add it to every phase it needs. Systems don't require each other; they get their dependencies through `init` (for example, `FlyingCarpet` is passed into `SkyHotel` and `ChestSystem`). The one exception is the stateless helper [ToolUtil.lua](src/server/modules/ToolUtil.lua), which any module may `require(script.Parent.ToolUtil)`.
 
-### Running the game
-```bash
-# In the project root:
-rojo serve
-```
-Then in Roblox Studio, open the Rojo plugin and click **Connect**.
-Press **Play** to test.
+**Client/server boundary.** All RemoteEvents, plus the server-only `FoodStolenServer` BindableEvent, are created idempotently in [src/shared/RemoteEvents.lua](src/shared/RemoteEvents.lua) with `getOrCreate`. Never create one inline. Each client LocalScript fires input to the server; the server validates it (range, cooldown, raycast) and applies the result:
+- `BatClient` → `BatSwing` → `BatCombat`. Damages players (only when `Config.PVP_ENABLED`), guards (`Guard_*` models), creatures (models with `IsCreature`) and breakable castle parts. It finds targets with one `GetPartBoundsInRadius` query, never a workspace scan.
+- `WeaponClient` → `ShootWeapon` → `ChestSystem`. Pistol/Rifle hitscan.
+- `FridgeClient` → `GiveFood` / `DropFood` → `FoodInventory`.
+- Prefer server-side ProximityPrompts over client remotes for world interactions: sell stand, shop, fridges, chests and the multiplier all handle `Triggered` on the server.
+- Flying carpets send nothing. `FlyingCarpet` samples each rider's `HumanoidRootPart` on the server and rubber-bands illegal speed or height. Server-initiated teleports must use `ToolUtil.teleport`, which stamps `LastServerTeleport` so the validator doesn't snap the player back.
+- Server → client: `Notify` (toast, shown by `Hud`) is the only way to give one player text feedback. A ProximityPrompt's text is shared by everyone, so never change `ActionText` for one player's feedback. Other feedback events: `HitFlash`, `BatHit`, `FoodStolen`, `FridgeStoredFeedback`, `CarpetSpawned`, `CarpetRevoked`.
+- `FoodSystem` fires `FoodStolenServer` (a BindableEvent) to alert `HunterAI`.
 
-### Building a `.rbxl` file (for publishing)
-```bash
-rojo build default.project.json -o game.rbxl
-```
+**Creatures have two behaviour modes, chosen from the spawn position** (`EnemyAI.spawn`). A creature spawned inside the hotel footprint patrols its floor and only notices players on that floor. A creature spawned outside (by `WorldPopulation`) guards the area around its spawn point and ignores players inside the hotel.
 
----
+**Cosmetic work runs on the client.** The airplane model (`AirplaneFlight` event → `AirplaneClient`), the birds (`AmbientBirds`) and the day/night colour blend (`DayNightLighting`) are animated locally. The server only owns state that affects gameplay: `Lighting.ClockTime`, the `DayLength` attribute on Lighting, and air-drop food. Unanchored NPCs and loot call `ToolUtil.claimNetworkOwnership` so clients can't move them.
 
-## How to Add a New Food Type
+**Food is identified by a tag, and its state lives on the tool.** Always build food with `ToolUtil.makeFoodTool(foodType, opts)`. It tags the handle with `IsFood=true` and sets `FoodId`, `BaseSellPrice`, `CurrentSellPrice`, `Rarity`, `StoredAtLevel` and `Multiplied`. Every system that confiscates, sells, stores, gives, drops, multiplies or saves food selects tools with `ToolUtil.isFood` / `getFoodTools`. Never select food by excluding the bat or carpet: that rule is how weapons used to be sold and confiscated. Other tools carry `IsBat`, `IsCarpet` or `IsWeapon` and are never food.
 
-1. Open [src/server/modules/Config.lua](src/server/modules/Config.lua)
-2. Add an entry to the `FOOD_TYPES` table:
-   ```lua
-   {
-     name        = "Taco",
-     color       = BrickColor.new("Bright orange"),
-     size        = Vector3.new(2, 0.8, 1.5),
-     texture     = "rbxassetid://YOUR_ID_HERE",
-     sideTexture = nil,
-     sellPrice   = 18,
-     rarity      = "Common",  -- "Common" | "Rare" | "Epic"
-   },
-   ```
-3. To upload a real image:
-   - In Studio: **View → Asset Manager → Images → Import from Device**
-   - Upload a PNG/JPG (max 1024×1024; 512×512 recommended)
-   - Right-click the uploaded image → **Copy Asset ID**
-   - Paste into the `texture` field above
-4. Save and reconnect Rojo — no other code changes needed.
+Prices: the fridge sets `CurrentSellPrice = floor(BaseSellPrice × (1 + FRIDGE_BONUS_PER_LEVEL × level))`, calculated from the base price and never compounded. It only processes items whose `StoredAtLevel` is below the player's level, and pays the store Score once per item. The sell stand reads `CurrentSellPrice`. Food Multiplier output is tagged `Multiplied` and can't be multiplied again. Every way of picking up food respects `Config.MAX_FOOD_CARRIED`.
 
----
+Only `FlyingCarpet.giveCarpet(player, isNightCarpet)` creates carpet tools (one per player). The single night carpet is tied to the tool's lifetime: if the tool is destroyed, the world carpet respawns.
 
-## Coding Conventions
+**Persistence.** Only `GameSystems` touches the DataStore. It uses key `"PlayerData_v3"` (bump the suffix for breaking shape changes; the inventory loader accepts both old plain names and new metadata tables). It saves leaderstats, food inventory with price metadata, WalkSpeed/JumpPower, the per-player fridge level and `collectedFood`.
+- **Data-safety rule:** a player is saved only after their load succeeded (`settings.loaded`). If every load retry fails, the session runs unsaved rather than overwriting the real record with defaults.
+- Loads retry with backoff, saves use `UpdateAsync`, and `BindToClose` saves in parallel and waits for them to finish.
+- Movement settings are saved from the cache, never from the live Humanoid, which may be stunned. Purchases call `GameSystems.updateSettings` (clamped to `MAX_WALK_SPEED` / `MAX_JUMP_POWER`) and then `applySettings`. Money changes go through `addMoney` / `trySpend`.
+- The fridge level is published as the Player attribute `FridgeLevel`. `RefrigeratorSystem` adds `FridgeNextCost`, `FridgeBonusPct` and `FridgeMaxLevel`, and `FridgeClient` renders them locally, because Config isn't replicated to clients.
+- Score values come from `Config.SCORE_*`.
+
+**Content/tuning** (food types, creature names, floor geometry, asset IDs, day length) all lives in [Config.lua](src/server/modules/Config.lua). To add a food type, add an entry to `Config.FOOD_TYPES` (`name`, `color`, `size`, `texture`, `sideTexture`, `sellPrice`, `rarity` = `"Common" | "Rare" | "Epic"`). No other code changes are needed.
+
+## Conventions
 
 | Topic | Rule |
 |-------|------|
-| Threading | Always use `task.wait()`, `task.spawn()`, `task.delay()` — never legacy `wait()` / `spawn()` |
-| Modules | Every system is a ModuleScript returning a table; no global state |
-| RemoteEvents | Declared once in `shared/RemoteEvents.lua`; never create inline |
-| Knockback / flight | Use `AssemblyLinearVelocity` — `BodyVelocity` is deprecated |
-| Client effects | All visual effects visible only to one player go in `Effects.client.lua` |
-| Debounce | All repeating interactions (doors, hits, swings) use timestamp-based debounce |
-| DataStore | Wrap every call in `pcall`; use versioned key `"PlayerData_v1"` |
-| Tool attributes | Food tools carry `BaseSellPrice`, `CurrentSellPrice`, `Rarity`, `FoodId` — always set these in `FoodSystem.lua` on the handle |
-| Protected tools | Tag bat handles `IsBat=true`, carpet handles `IsCarpet=true`; the `isProtected()` helper in `EnemyAI` and `HunterAI` skips these during confiscation |
-| Night detection | Poll `Lighting.ClockTime` directly (≥20 or <6 = night) — do not call into `DayNight` module from other modules |
-| Fridge bonuses | `RefrigeratorSystem` writes `CurrentSellPrice` onto the tool handle; the sell stand reads this attribute, not the Config table |
-
----
-
-## Score System
-| Action | Points |
-|--------|--------|
-| Steal a food item | +10 |
-| Store food in fridge | +25 |
-
-Fridge upgrades raise `CurrentSellPrice` (the Money reward at sell time) — the +25 Score for storing is unchanged.
-
-Stats are visible in the Roblox leaderboard as **Food Stolen** and **Score** and persist via DataStore between sessions.
-
----
-
-## RemoteEvents Reference
-
-| Event | Direction | Fired by | Handled by |
-|-------|-----------|----------|------------|
-| HitFlash | Server→Client | BatCombat, EnemyAI | Effects.client.lua |
-| FoodStolen | Server→Client | FoodSystem | Effects.client.lua |
-| BatSwing | Client→Server | client tool | BatCombat.lua |
-| BatHit | Server→Client | BatCombat | Effects.client.lua |
-| GiveFood | Client→Server | FridgeClient | FoodInventory.lua |
-| DropFood | Client→Server | FridgeClient | FoodInventory.lua |
-| UpgradeFridge | Client→Server | ProximityPrompt | RefrigeratorSystem.lua |
-| StoreFoodInFridge | Client→Server | ProximityPrompt | RefrigeratorSystem.lua |
-| FridgeStoredFeedback | Server→Client | RefrigeratorSystem | FridgeClient.client.lua |
-| CarpetPositionUpdate | Client→Server | FlyingCarpetClient | FlyingCarpet.lua |
-| CarpetRevoked | Server→Client | FlyingCarpet | FlyingCarpetClient.client.lua |
-| CarpetSpawned | Server→Client | FlyingCarpet | FlyingCarpetClient.client.lua |
-| FoodStolenServer *(BindableEvent)* | Server→Server | FoodSystem | HunterAI.lua |
-
----
-
-## Known Asset IDs
-The following texture IDs are used by default and can be replaced in `Config.lua`:
-
-| Food | Asset ID |
-|------|----------|
-| Pizza (top) | `rbxassetid://6886896591` |
-| Burger | `rbxassetid://7229442422` |
-| Cake | `rbxassetid://7495147696` |
-| Bread | `rbxassetid://6324656637` |
-| Apple | `rbxassetid://6886896313` |
-| Sparkle FX | `rbxassetid://744949272` |
-
-> These IDs were present in the original project. Verify them in Studio by pasting into a Decal's **Texture** field in the Properties panel.
-
----
-
-## Bug Fixes vs Original
-| Bug | Fix |
-|-----|-----|
-| Screen flash affected all players | Moved to `Effects.client.lua` via `HitFlash` RemoteEvent |
-| `BodyVelocity` deprecation warning | Replaced with `AssemblyLinearVelocity` |
-| `wait()` / `spawn()` deprecation | Replaced with `task.*` equivalents |
-| Door spam (no cooldown) | Added 0.5 s timestamp debounce per door |
-| Creature loop leaks after destroy | `waiter.Destroying` signal breaks the AI loop |
-| All Tools treated as food | Guarded with `item:IsA("Tool")` checks |
-| Elevator didn't carry players | Replaced TweenService with 20Hz manual `task.spawn` loop that co-moves player HRP by delta Y |
-| Bat/carpet confiscated by enemies | `IsBat` / `IsCarpet` attribute guards in `isProtected()` helper used by EnemyAI and HunterAI |
+| Threading | `task.wait/spawn/delay` only, never legacy `wait()` / `spawn()` |
+| Physics | Use `AssemblyLinearVelocity` for knockback and flight. `BodyVelocity` is deprecated |
+| Client-only visuals | Effects that only one player should see go in `Effects.client.lua` and are triggered by a RemoteEvent (an earlier screen flash showed for every player) |
+| Debounce | Repeating interactions use an `os.clock()` timestamp debounce that is nil-safe (`if last and now - last < cd`). Never use `now - (last or 0)`: `os.clock()` starts near 0, so the first use would be blocked. Don't use `tick()` |
+| One-shot prompts | Guard prompts that hand out a single reward (food pickup, chests, drops) with a local `taken`/`opened` flag. Two players can trigger in the same frame |
+| Tool handling | Use `ToolUtil.isFood` / `isCarpet`; never classify by tool name or by "not a bat" |
+| Night detection | Poll `Lighting.ClockTime` directly (≥20 or <6 = night). Don't call into `DayNight` from other modules |
+| AI loops | One controller loop per NPC owns every `MoveTo` call (no spawned move threads). Stop on `Destroying` or `Humanoid.Died`; defeated NPCs respawn after `*_RESPAWN_TIME` |
+| Moving platforms | Lifts are unanchored, server-owned platforms driven by a servo `PrismaticConstraint`, so physics carries the riders. Never write CFrames on client-owned characters every frame |

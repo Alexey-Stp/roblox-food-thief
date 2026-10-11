@@ -10,12 +10,14 @@ local localPlayer = Players.LocalPlayer
 
 -- -------------------------------------------------------------------------
 -- Day-cycle constants
--- DAY_CYCLE_SECONDS must equal Config.DAY_LENGTH on the server (default 240).
--- If you change Config.DAY_LENGTH, update this value to match so that the
--- countdown timers remain accurate.  (Lighting.ClockTime is replicated so
--- the client always has the correct current hour; only the rate differs.)
+-- The server publishes Config.DAY_LENGTH as the Lighting attribute "DayLength"
+-- (DayNight.lua), so countdowns stay accurate if it changes.
 -- -------------------------------------------------------------------------
-local DAY_CYCLE_SECONDS = 240 -- real seconds for one full 24-hour in-game day
+local DEFAULT_DAY_CYCLE_SECONDS = 240
+
+local function dayCycleSeconds()
+	return Lighting:GetAttribute("DayLength") or DEFAULT_DAY_CYCLE_SECONDS
+end
 
 -- Phase thresholds (in-game hours)
 local HOUR_DAWN = 6
@@ -118,7 +120,7 @@ local function secondsUntil(currentHour, targetHour)
 	-- Hours remaining (wraps past 24)
 	local hoursRemaining = (targetHour - currentHour) % 24
 	-- Convert in-game hours → real seconds
-	local realSeconds = hoursRemaining / (24 / DAY_CYCLE_SECONDS)
+	local realSeconds = hoursRemaining / (24 / dayCycleSeconds())
 	return realSeconds
 end
 

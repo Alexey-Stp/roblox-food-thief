@@ -116,8 +116,17 @@ describe("Config", function()
             assert.is_true(Config.FRIDGE_COUNT > 0)
         end)
 
-        it("FRIDGE_CAPACITY is positive", function()
-            assert.is_true(Config.FRIDGE_CAPACITY > 0)
+        it("FRIDGE_BONUS_PER_LEVEL is positive", function()
+            assert.is_true(Config.FRIDGE_BONUS_PER_LEVEL > 0)
+        end)
+
+        it("default movement values are within the shop caps", function()
+            assert.is_true(Config.DEFAULT_WALK_SPEED <= Config.MAX_WALK_SPEED)
+            assert.is_true(Config.DEFAULT_JUMP_POWER <= Config.MAX_JUMP_POWER)
+        end)
+
+        it("MAX_FOOD_CARRIED is positive", function()
+            assert.is_true(Config.MAX_FOOD_CARRIED > 0)
         end)
 
         it("SHOP_SPEED_COST is positive", function()

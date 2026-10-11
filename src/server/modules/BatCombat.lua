@@ -3,9 +3,10 @@
 -- Design rationale: the client fires BatSwing when the tool activates; the server
 -- performs its own spatial scan so exploiters cannot fake targets or bypass cooldowns.
 --
--- Damage targets (all server-validated):
---   1. Other players (PvP)
---   2. Hunter guard NPCs (Models whose name starts with "Guard_")
+-- Damage targets (all server-validated, all found by one spatial query):
+--   1. Other players (PvP, when Config.PVP_ENABLED)
+--   2. NPCs: Hunter guards (Models named "Guard_*") and floor creatures
+--      (Models with the IsCreature attribute)
 --   3. Parts named "Door" or "Wall" inside any Model named "Castle"
 --      → health tracked via a "Health" attribute; at zero the part becomes
 --        transparent and non-collidable (destroyed after a 2-second delay).
@@ -19,11 +20,52 @@ local Config = nil
 local RemoteEvents = nil
 
 -- Server-side swing cooldowns keyed by player UserId
-local cooldowns = {} -- [UserId] = tick() of last accepted swing
+local cooldowns = {} -- [UserId] = os.clock() of last accepted swing
 
 -- -------------------------------------------------------------------------
 -- Bat tool construction
 -- -------------------------------------------------------------------------
+-- True for NPC models the bat may damage
+local function isDamageableNpc(model)
+	if not model or not model:IsA("Model") then
+		return false
+	end
+	if model.Name:sub(1, 6) == "Guard_" then
+		return true
+	end
+	-- Player characters are handled (and gated by PVP_ENABLED) in the PvP pass
+	if Players:GetPlayerFromCharacter(model) then
+		return false
+	end
+	return model:GetAttribute("IsCreature") == true
+end
+
+local function damageCastlePart(part)
+	local hp = (part:GetAttribute("Health") or Config.CASTLE_PART_HEALTH) - Config.BAT_DAMAGE
+	if hp <= 0 then
+		-- Part destroyed: make intangible, remove after a short delay
+		part:SetAttribute("Health", 0)
+		part.Transparency = 1
+		part.CanCollide = false
+		task.delay(Config.CASTLE_PART_DESTROY_DELAY, function()
+			if part.Parent then
+				part:Destroy()
+			end
+		end)
+	else
+		part:SetAttribute("Health", hp)
+	end
+end
+
+local function isCastlePart(part)
+	local parent = part.Parent
+	return part:IsA("BasePart")
+		and (part.Name == "Door" or part.Name == "Wall")
+		and parent ~= nil
+		and parent.Name == "Castle"
+		and (part:GetAttribute("Health") or 1) > 0
+end
+
 local function buildBat()
 	local tool = Instance.new("Tool")
 	tool.Name = "Bat"
@@ -102,8 +144,9 @@ function BatCombat.init(remoteEvents, config)
 		end
 
 		-- 2. Cooldown check — stamp immediately so duplicate packets are rejected
-		local now = tick()
-		if now - (cooldowns[player.UserId] or 0) < Config.BAT_COOLDOWN then
+		local now = os.clock()
+		local last = cooldowns[player.UserId]
+		if last and now - last < Config.BAT_COOLDOWN then
 			return
 		end
 		cooldowns[player.UserId] = now
@@ -125,7 +168,7 @@ function BatCombat.init(remoteEvents, config)
 		-- ── 4a. PvP: check each nearby part for an enemy player character ─
 		local hitPlayers = {} -- guard against hitting the same player twice
 		for _, part in ipairs(nearbyParts) do
-			if hitConfirmed then
+			if hitConfirmed or not Config.PVP_ENABLED then
 				break
 			end
 			local otherChar = part.Parent
@@ -152,7 +195,7 @@ function BatCombat.init(remoteEvents, config)
 					break
 				end
 				local model = part.Parent
-				if model and model:IsA("Model") and model.Name:sub(1, 6) == "Guard_" and not hitModels[model] then
+				if isDamageableNpc(model) and not hitModels[model] then
 					local npcHumanoid = model:FindFirstChildOfClass("Humanoid")
 					if npcHumanoid and npcHumanoid.Health > 0 then
 						hitModels[model] = true
@@ -165,37 +208,13 @@ function BatCombat.init(remoteEvents, config)
 		end
 
 		-- ── 4c. Castle destructible parts (Door / Wall inside a "Castle" model) ─
+		-- Uses the same spatial query (bounding boxes) — no workspace-wide scan.
 		if not hitConfirmed then
-			-- Search any Model named "Castle" anywhere in the workspace hierarchy
-			for _, obj in ipairs(workspace:GetDescendants()) do
-				if obj:IsA("Model") and obj.Name == "Castle" then
-					for _, part in ipairs(obj:GetDescendants()) do
-						if part:IsA("BasePart") and (part.Name == "Door" or part.Name == "Wall") then
-							local dist = (part.Position - myHRP.Position).Magnitude
-							if dist <= Config.BAT_RANGE then
-								local hp = (part:GetAttribute("Health") or Config.CASTLE_PART_HEALTH)
-									- Config.BAT_DAMAGE
-								if hp <= 0 then
-									-- Part destroyed: make intangible, remove after a short delay
-									part.Transparency = 1
-									part.CanCollide = false
-									task.delay(Config.CASTLE_PART_DESTROY_DELAY, function()
-										if part and part.Parent then
-											part:Destroy()
-										end
-									end)
-								else
-									part:SetAttribute("Health", hp)
-								end
-								RemoteEvents.BatHit:FireClient(player)
-								hitConfirmed = true
-								break
-							end
-						end
-					end
-					if hitConfirmed then
-						break
-					end
+			for _, part in ipairs(nearbyParts) do
+				if isCastlePart(part) then
+					damageCastlePart(part)
+					RemoteEvents.BatHit:FireClient(player)
+					break
 				end
 			end
 		end

@@ -5,6 +5,9 @@
 --     (targeted by the Bat's Castle-destruction logic in BatCombat.lua)
 --   • Three healing food stations — players press E to consume and restore HP
 --   • A Magic Carpet Chest — opens every 30 s per player and awards bonus Money
+--     plus a carpet (via FlyingCarpet.giveCarpet — max one per player)
+--   • Teleporter pads: one on the ground (Config.SKY_PAD_GROUND_POS) up to the
+--     platform, one on the platform back down
 --
 -- Visual improvements applied throughout:
 --   • Cobblestone / SmoothPlastic materials
@@ -13,9 +16,17 @@
 
 local Players = game:GetService("Players")
 
+local ToolUtil = require(script.Parent.ToolUtil)
+
 local SkyHotel = {}
 
 local Config = nil
+local GameSystems = nil
+local FlyingCarpet = nil
+local RemoteEvents = nil
+
+local PAD_COOLDOWN = 2 -- seconds between teleports per player
+local padCooldowns = {} -- [UserId] = os.clock()
 
 -- -------------------------------------------------------------------------
 -- Internal helper: create an anchored BasePart
@@ -270,60 +281,29 @@ local function buildChest(parent)
 	pp.Parent = body
 
 	local chestCooldowns = {}
+	Players.PlayerRemoving:Connect(function(player)
+		chestCooldowns[player.UserId] = nil
+	end)
 
 	pp.Triggered:Connect(function(player)
-		local now = tick()
-		if now - (chestCooldowns[player.UserId] or 0) < Config.SKY_HOTEL_CHEST_COOLDOWN then
+		local now = os.clock()
+		local last = chestCooldowns[player.UserId]
+		if last and now - last < Config.SKY_HOTEL_CHEST_COOLDOWN then
+			RemoteEvents.Notify:FireClient(
+				player,
+				"Chest ready in " .. math.ceil(Config.SKY_HOTEL_CHEST_COOLDOWN - (now - last)) .. "s"
+			)
 			return
 		end
 		chestCooldowns[player.UserId] = now
 
-		-- Award bonus Money
-		local ls = player:FindFirstChild("leaderstats")
-		if ls then
-			local money = ls:FindFirstChild("Money")
-			if money then
-				money.Value = money.Value + Config.SKY_HOTEL_CHEST_REWARD
-			end
-		end
-
-		-- Give the player a FlyingCarpet tool directly
-		-- (independent copy — works even during daytime unlike the night spawn)
-		local carpetTool = Instance.new("Tool")
-		carpetTool.Name = "FlyingCarpet"
-		carpetTool.RequiresHandle = true
-		carpetTool.ToolTip = "A magical flying carpet!"
-
-		local carpetHandle = Instance.new("Part")
-		carpetHandle.Name = "Handle"
-		carpetHandle.Size = Vector3.new(6, 0.3, 4)
-		carpetHandle.BrickColor = BrickColor.new("Bright red")
-		carpetHandle.Material = Enum.Material.Fabric
-		carpetHandle.Reflectance = 0.12
-		carpetHandle.CanCollide = false
-		carpetHandle:SetAttribute("IsCarpet", true)
-		carpetHandle.Parent = carpetTool
-
-		-- Decorative neon borders on the handle
-		for _, b in ipairs({
-			{ size = Vector3.new(6, 0.3, 0.3), offset = Vector3.new(0, 0, 1.85) },
-			{ size = Vector3.new(6, 0.3, 0.3), offset = Vector3.new(0, 0, -1.85) },
-			{ size = Vector3.new(0.3, 0.3, 4), offset = Vector3.new(2.85, 0, 0) },
-			{ size = Vector3.new(0.3, 0.3, 4), offset = Vector3.new(-2.85, 0, 0) },
-		}) do
-			local strip = Instance.new("Part")
-			strip.Size = b.size
-			strip.BrickColor = BrickColor.new("Bright yellow")
-			strip.Material = Enum.Material.Neon
-			strip.CanCollide = false
-			strip.CFrame = CFrame.new(b.offset)
-			strip.Parent = carpetTool
-			local w = Instance.new("WeldConstraint")
-			w.Part0, w.Part1 = carpetHandle, strip
-			w.Parent = carpetHandle
-		end
-
-		carpetTool.Parent = player.Backpack
+		GameSystems.addMoney(player, Config.SKY_HOTEL_CHEST_REWARD)
+		-- Independent of the night carpet; works during daytime. One per player.
+		local gotCarpet = FlyingCarpet.giveCarpet(player, false)
+		RemoteEvents.Notify:FireClient(
+			player,
+			"+$" .. Config.SKY_HOTEL_CHEST_REWARD .. (gotCarpet and " and a Flying Carpet!" or "")
+		)
 
 		-- Brief visual feedback: golden flash on the chest
 		local flash = Instance.new("PointLight")
@@ -332,7 +312,7 @@ local function buildChest(parent)
 		flash.Range = 18
 		flash.Parent = body
 		task.delay(1.5, function()
-			if flash and flash.Parent then
+			if flash.Parent then
 				flash:Destroy()
 			end
 		end)
@@ -340,11 +320,64 @@ local function buildChest(parent)
 end
 
 -- -------------------------------------------------------------------------
+-- Teleporter pads (ground ↔ sky platform)
+-- -------------------------------------------------------------------------
+local function buildPad(parent, name, position, label, destination)
+	local pad = makePart(name, Vector3.new(8, 1, 8), position, "Bright violet", Enum.Material.Neon, parent)
+
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Top
+	gui.Parent = pad
+	local text = Instance.new("TextLabel")
+	text.Size = UDim2.new(1, 0, 1, 0)
+	text.BackgroundTransparency = 1
+	text.TextScaled = true
+	text.Font = Enum.Font.SourceSansBold
+	text.TextColor3 = Color3.new(1, 1, 1)
+	text.Text = label
+	text.Parent = gui
+
+	pad.Touched:Connect(function(hit)
+		local character = hit.Parent
+		local player = character and Players:GetPlayerFromCharacter(character)
+		if not player then
+			return
+		end
+		local now = os.clock()
+		local last = padCooldowns[player.UserId]
+		if last and now - last < PAD_COOLDOWN then
+			return
+		end
+		padCooldowns[player.UserId] = now
+		ToolUtil.teleport(player, CFrame.new(destination))
+	end)
+	return pad
+end
+
+local function buildTeleporters(parent)
+	local center = Config.SKY_HOTEL_CENTER
+	local y = Config.SKY_HOTEL_Y
+	local skyPadPos = Vector3.new(center.X + 35, y + 2.5, center.Z + 30)
+	local groundPadPos = Config.SKY_PAD_GROUND_POS
+
+	-- Arrive beside the opposite pad so players don't bounce straight back
+	buildPad(parent, "SkyPad_Up", groundPadPos, "⬆ SKY HOTEL", skyPadPos + Vector3.new(-10, 4, 0))
+	buildPad(parent, "SkyPad_Down", skyPadPos, "⬇ GROUND", groundPadPos + Vector3.new(-10, 4, 0))
+end
+
+-- -------------------------------------------------------------------------
 -- Public API
 -- -------------------------------------------------------------------------
 
-function SkyHotel.init(config)
+function SkyHotel.init(config, gameSystems, flyingCarpet, remoteEvents)
 	Config = config
+	GameSystems = gameSystems
+	FlyingCarpet = flyingCarpet
+	RemoteEvents = remoteEvents
+
+	Players.PlayerRemoving:Connect(function(player)
+		padCooldowns[player.UserId] = nil
+	end)
 end
 
 function SkyHotel.build()
@@ -356,6 +389,7 @@ function SkyHotel.build()
 	buildCastle(skyModel)
 	buildHealingFoods(skyModel)
 	buildChest(skyModel)
+	buildTeleporters(skyModel)
 
 	print("[SkyHotel] Sky Hotel Castle built at Y=" .. Config.SKY_HOTEL_Y)
 end

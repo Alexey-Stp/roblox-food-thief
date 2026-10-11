@@ -4,8 +4,9 @@
 --   HealingFood (50%) — restores 50 HP immediately (no tool)
 --   Pistol       (25%) — hitscan ranged weapon, 15 dmg, 60-stud range
 --   Rifle        (20%) — hitscan ranged weapon, 30 dmg, 120-stud range
---   MagicCarpet   (5%) — rare; grants a FlyingCarpet tool
--- Chests respawn 60 s after being opened.  Server validates all weapon shots
+--   MagicCarpet   (5%) — rare; grants a carpet via FlyingCarpet.giveCarpet
+--                         (falls back to HealingFood if the player has one)
+-- Chests respawn CHEST_RESPAWN_TIME seconds after being opened.  Server validates all weapon shots
 -- via the ShootWeapon RemoteEvent (fired by WeaponClient.client.lua).
 
 local Players = game:GetService("Players")
@@ -15,8 +16,7 @@ local ChestSystem = {}
 
 local Config = nil
 local RemoteEvents = nil
-
-local CHEST_RESPAWN_TIME = 60 -- seconds
+local FlyingCarpet = nil
 
 -- Weighted loot table
 local LOOT_TABLE = {
@@ -32,7 +32,7 @@ for _, entry in ipairs(LOOT_TABLE) do
 	TOTAL_WEIGHT = TOTAL_WEIGHT + entry.weight
 end
 
--- Per-player weapon shot cooldowns  [UserId] = { Pistol = tick, Rifle = tick }
+-- Per-player weapon shot cooldowns  [UserId] = { Pistol = os.clock(), Rifle = os.clock() }
 local weaponCooldowns = {}
 
 local WEAPON_COOLDOWN = { Pistol = 1, Rifle = 2 }
@@ -68,6 +68,7 @@ local function buildPistol()
 	handle.Size = Vector3.new(0.4, 1, 0.8)
 	handle.BrickColor = BrickColor.new("Dark stone grey")
 	handle.Material = Enum.Material.Metal
+	handle:SetAttribute("IsWeapon", true)
 	handle.Parent = tool
 
 	local barrel = Instance.new("Part")
@@ -97,6 +98,7 @@ local function buildRifle()
 	handle.Size = Vector3.new(0.4, 1, 2.2)
 	handle.BrickColor = BrickColor.new("Reddish brown")
 	handle.Material = Enum.Material.Wood
+	handle:SetAttribute("IsWeapon", true)
 	handle.Parent = tool
 
 	local barrel = Instance.new("Part")
@@ -115,24 +117,6 @@ local function buildRifle()
 	return tool
 end
 
-local function buildCarpetTool()
-	-- Minimal carpet tool — FlyingCarpetClient drives the actual flight
-	local tool = Instance.new("Tool")
-	tool.Name = "FlyingCarpet"
-	tool.RequiresHandle = true
-	tool.ToolTip = "Flying Carpet — equip to fly at night"
-
-	local handle = Instance.new("Part")
-	handle.Name = "Handle"
-	handle.Size = Vector3.new(4, 0.2, 6)
-	handle.BrickColor = BrickColor.new("Bright red")
-	handle.Material = Enum.Material.Fabric
-	handle:SetAttribute("IsCarpet", true)
-	handle.Parent = tool
-
-	return tool
-end
-
 -- -------------------------------------------------------------------------
 -- Give loot to player
 -- -------------------------------------------------------------------------
@@ -143,24 +127,26 @@ local function giveLoot(player, lootName)
 	end
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
 
+	-- Carpet is rare and limited to one per player; otherwise heal instead
+	if lootName == "MagicCarpet" then
+		if FlyingCarpet.giveCarpet(player, false) then
+			RemoteEvents.Notify:FireClient(player, "You found a Magic Carpet!")
+			return
+		end
+		lootName = "HealingFood"
+	end
+
 	if lootName == "HealingFood" then
 		if humanoid and humanoid.Health > 0 then
 			humanoid.Health = math.min(humanoid.Health + 50, humanoid.MaxHealth)
 		end
+		RemoteEvents.Notify:FireClient(player, "Healing food: +50 HP")
 	elseif lootName == "Pistol" then
 		local tool = buildPistol()
 		tool.Parent = player.Backpack
 	elseif lootName == "Rifle" then
 		local tool = buildRifle()
 		tool.Parent = player.Backpack
-	elseif lootName == "MagicCarpet" then
-		-- Only give if the player doesn't already have one
-		if not player.Backpack:FindFirstChild("FlyingCarpet") then
-			local carpetTool = char:FindFirstChild("FlyingCarpet")
-			if not carpetTool then
-				buildCarpetTool().Parent = player.Backpack
-			end
-		end
 	end
 end
 
@@ -239,8 +225,13 @@ end
 local function spawnChest(pos)
 	local model, body, lid, pp = buildChest(pos)
 
+	local opened = false
 	pp.Triggered:Connect(function(player)
-		-- Disable prompt immediately so only one player gets the reward
+		-- Two players can trigger in the same frame: only the first one wins
+		if opened then
+			return
+		end
+		opened = true
 		pp.Enabled = false
 
 		-- Animate lid open
@@ -258,7 +249,7 @@ local function spawnChest(pos)
 				model:Destroy()
 			end
 		end)
-		task.delay(CHEST_RESPAWN_TIME, function()
+		task.delay(Config.CHEST_RESPAWN_TIME, function()
 			spawnChest(pos)
 		end)
 	end)
@@ -284,12 +275,13 @@ local function handleShot(player, toolName, aimDir)
 	end
 
 	-- Cooldown check
-	local now = tick()
+	local now = os.clock()
 	if not weaponCooldowns[player.UserId] then
 		weaponCooldowns[player.UserId] = {}
 	end
 	local cd = WEAPON_COOLDOWN[toolName] or 1
-	if now - (weaponCooldowns[player.UserId][toolName] or 0) < cd then
+	local last = weaponCooldowns[player.UserId][toolName]
+	if last and now - last < cd then
 		return
 	end
 	weaponCooldowns[player.UserId][toolName] = now
@@ -313,22 +305,27 @@ local function handleShot(player, toolName, aimDir)
 		return
 	end
 
-	local hitPart = result.Instance
-	local hitChar = hitPart.Parent
+	-- Accessories / tool parts are nested; resolve to the owning Model
+	local hitChar = result.Instance:FindFirstAncestorOfClass("Model")
+	if not hitChar then
+		return
+	end
 
 	-- Try to damage a player
 	local targetPlayer = Players:GetPlayerFromCharacter(hitChar)
-	if targetPlayer and targetPlayer ~= player then
-		local humanoid = hitChar:FindFirstChildOfClass("Humanoid")
-		if humanoid and humanoid.Health > 0 then
-			humanoid:TakeDamage(damage)
-			RemoteEvents.HitFlash:FireClient(targetPlayer)
+	if targetPlayer then
+		if targetPlayer ~= player and Config.PVP_ENABLED then
+			local humanoid = hitChar:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.Health > 0 then
+				humanoid:TakeDamage(damage)
+				RemoteEvents.HitFlash:FireClient(targetPlayer)
+			end
 		end
 		return
 	end
 
-	-- Try to damage a Guard NPC
-	if hitChar and hitChar:IsA("Model") and hitChar.Name:sub(1, 6) == "Guard_" then
+	-- Try to damage a Guard NPC or floor creature
+	if hitChar.Name:sub(1, 6) == "Guard_" or hitChar:GetAttribute("IsCreature") == true then
 		local humanoid = hitChar:FindFirstChildOfClass("Humanoid")
 		if humanoid and humanoid.Health > 0 then
 			humanoid:TakeDamage(damage)
@@ -340,9 +337,10 @@ end
 -- Public API
 -- -------------------------------------------------------------------------
 
-function ChestSystem.init(remoteEvents, config)
+function ChestSystem.init(remoteEvents, config, flyingCarpet)
 	RemoteEvents = remoteEvents
 	Config = config
+	FlyingCarpet = flyingCarpet
 
 	RemoteEvents.ShootWeapon.OnServerEvent:Connect(function(player, toolName, aimDir)
 		if toolName == "Pistol" or toolName == "Rifle" then

@@ -2,31 +2,26 @@
 -- Handles spawning food on tables, E-key pickup via ProximityPrompt, and respawning.
 -- Fires RemoteEvents to the client for visual effects.
 
+local ToolUtil = require(script.Parent.ToolUtil)
+
 local FoodSystem = {}
 
 -- Injected from Main
 local RemoteEvents = nil
 local GameSystems = nil
+local Config = nil
 
-function FoodSystem.init(remoteEvents, gameSystems)
+local DEFAULT_RESPAWN_TIME = 5
+
+function FoodSystem.init(remoteEvents, gameSystems, config)
 	RemoteEvents = remoteEvents
 	GameSystems = gameSystems
+	Config = config
 end
 
-local function addDecals(part, foodType)
-	if foodType.texture then
-		local d = Instance.new("Decal")
-		d.Texture = foodType.texture
-		d.Face = Enum.NormalId.Top
-		d.Parent = part
-	end
-	if foodType.sideTexture then
-		for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
-			local d = Instance.new("Decal")
-			d.Texture = foodType.sideTexture
-			d.Face = face
-			d.Parent = part
-		end
+local function notify(player, text)
+	if RemoteEvents and RemoteEvents.Notify then
+		RemoteEvents.Notify:FireClient(player, text)
 	end
 end
 
@@ -41,7 +36,7 @@ local function createFood(foodType, position)
 	food.CanCollide = true
 	food.Parent = workspace
 
-	addDecals(food, foodType)
+	ToolUtil.addFoodDecals(food, foodType)
 
 	-- Green selection highlight
 	local highlight = Instance.new("SelectionBox")
@@ -59,31 +54,20 @@ local function createFood(foodType, position)
 	prompt.MaxActivationDistance = 8
 	prompt.Parent = food
 
+	local taken = false
 	prompt.Triggered:Connect(function(player)
-		if not (food and food.Parent) then
+		if taken or not food.Parent then
 			return
 		end
 
-		-- Build a Tool for the player's backpack
-		local tool = Instance.new("Tool")
-		tool.Name = foodType.name
-		tool.RequiresHandle = true
+		local limit = Config and Config.MAX_FOOD_CARRIED
+		if limit and ToolUtil.countFood(player) >= limit then
+			notify(player, "Your hands are full! Sell or store food first.")
+			return
+		end
+		taken = true
 
-		local handle = Instance.new("Part")
-		handle.Name = "Handle"
-		handle.Size = foodType.size * 0.7
-		handle.BrickColor = foodType.color
-		handle.Material = Enum.Material.SmoothPlastic
-		addDecals(handle, foodType)
-
-		-- Food metadata attributes (used by fridge, sell stand, and give/drop systems)
-		handle:SetAttribute("BaseSellPrice", foodType.sellPrice)
-		handle:SetAttribute("CurrentSellPrice", foodType.sellPrice)
-		handle:SetAttribute("Rarity", foodType.rarity or "Common")
-		handle:SetAttribute("FoodId", foodType.name)
-
-		handle.Parent = tool
-		tool.Parent = player.Backpack
+		ToolUtil.makeFoodTool(foodType).Parent = player.Backpack
 
 		-- Notify client for sparkle effect
 		if RemoteEvents then
@@ -100,11 +84,11 @@ local function createFood(foodType, position)
 			RemoteEvents.FoodStolenServer:Fire(player, food.Position)
 		end
 
-		local respawnPos = Vector3.new(position.X, position.Y, position.Z)
 		food:Destroy()
 
-		task.delay(5, function()
-			createFood(foodType, respawnPos)
+		local respawnTime = (Config and Config.FOOD_RESPAWN_TIME) or DEFAULT_RESPAWN_TIME
+		task.delay(respawnTime, function()
+			createFood(foodType, position)
 		end)
 	end)
 

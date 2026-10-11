@@ -265,4 +265,121 @@ describe("GameSystems", function()
         end)
     end)
 
+    -- -----------------------------------------------------------------------
+    -- Load / save lifecycle (data-loss protection)
+    -- -----------------------------------------------------------------------
+    describe("load / save lifecycle", function()
+        local function loadConfig()
+            package.loaded["src.server.modules.Config"] = nil
+            return require("src.server.modules.Config")
+        end
+
+        -- A player Instance parented under Players (so it counts as "still in game")
+        local function makeLivePlayer(userId)
+            local Players = game:GetService("Players")
+            local player = Instance.new("Player")
+            player.Name = "Live" .. userId
+            player.UserId = userId
+            player.Backpack = Instance.new("Backpack")
+            player.CharacterAdded = {
+                Connect = function() return { Disconnect = function() end } end,
+                Wait = function() end,
+            }
+            player.Parent = Players
+            return player
+        end
+
+        local function storeData()
+            return game:GetService("DataStoreService")._stores["PlayerData_v3"]._data
+        end
+
+        it("never overwrites saved data when the load failed", function()
+            local GS = loadGameSystems()
+            local Config = loadConfig()
+            GS.init(Config)
+            local Players = game:GetService("Players")
+            local store = game:GetService("DataStoreService")._stores["PlayerData_v3"]
+            store._data["555"] = { money = 9000, score = 1234 }
+            store.GetAsync = function() error("DataStore throttled") end
+
+            local player = makeLivePlayer(555)
+            Players._onPlayerAdded(player)
+            GS.addMoney(player, 5)
+            Players._onPlayerRemoving(player)
+
+            assert.equals(9000, storeData()["555"].money)
+            assert.equals(1234, storeData()["555"].score)
+        end)
+
+        it("loads stats and resets out-of-range WalkSpeed / JumpPower saves to defaults", function()
+            local GS = loadGameSystems()
+            local Config = loadConfig()
+            GS.init(Config)
+            local Players = game:GetService("Players")
+            storeData()["777"] = {
+                money = 300,
+                score = 50,
+                walkSpeed = Config.MAX_WALK_SPEED + 1,
+                jumpPower = Config.MAX_JUMP_POWER + 1,
+                fridgeLevel = 4,
+            }
+
+            local player = makeLivePlayer(777)
+            Players._onPlayerAdded(player)
+
+            local ls = player:FindFirstChild("leaderstats")
+            assert.equals(300, ls:FindFirstChild("Money").Value)
+            local walk, jump = GS.getSettings(player)
+            assert.equals(Config.DEFAULT_WALK_SPEED, walk)
+            assert.equals(Config.DEFAULT_JUMP_POWER, jump)
+            assert.equals(4, GS.getFridgeLevel(player))
+            assert.equals(4, player:GetAttribute("FridgeLevel"))
+        end)
+
+        it("keeps legitimately purchased movement upgrades", function()
+            local GS = loadGameSystems()
+            local Config = loadConfig()
+            GS.init(Config)
+            local Players = game:GetService("Players")
+            local bought = Config.DEFAULT_WALK_SPEED + Config.SPEED_BOOST
+            storeData()["999"] = { walkSpeed = bought, jumpPower = Config.MAX_JUMP_POWER }
+
+            local player = makeLivePlayer(999)
+            Players._onPlayerAdded(player)
+
+            local walk, jump = GS.getSettings(player)
+            assert.equals(bought, walk)
+            assert.equals(Config.MAX_JUMP_POWER, jump)
+        end)
+
+        it("saves cached settings and money after a successful load", function()
+            local GS = loadGameSystems()
+            local Config = loadConfig()
+            GS.init(Config)
+            local Players = game:GetService("Players")
+            storeData()["888"] = { money = 10 }
+
+            local player = makeLivePlayer(888)
+            Players._onPlayerAdded(player)
+            GS.addMoney(player, 90)
+            GS.updateSettings(player, Config.DEFAULT_WALK_SPEED + 8, nil)
+            GS.setFridgeLevel(player, 2)
+            Players._onPlayerRemoving(player)
+
+            local saved = storeData()["888"]
+            assert.equals(100, saved.money)
+            assert.equals(Config.DEFAULT_WALK_SPEED + 8, saved.walkSpeed)
+            assert.equals(2, saved.fridgeLevel)
+        end)
+
+        it("trySpend refuses when money is insufficient", function()
+            local GS = loadGameSystems()
+            local player = makePlayer()
+            GS.addMoney(player, 50)
+            assert.is_false(GS.trySpend(player, 60))
+            assert.is_true(GS.trySpend(player, 50))
+            assert.equals(0, player:FindFirstChild("leaderstats"):FindFirstChild("Money").Value)
+        end)
+    end)
+
 end)

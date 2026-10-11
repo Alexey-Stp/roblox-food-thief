@@ -11,19 +11,21 @@ PvE heist game on Roblox. Players sneak into the Grand Hotel, steal food from 3 
 
 1. Enter the hotel → steal food from tables (press **E**)
 2. Evade floor creatures (Wolves → Bears → Occultists) and **Hunter Guards** (blue-uniform NPCs)
-3. Fight back with the **Bat** (always in your backpack) — swing at nearby players or enemies
+3. Fight back with the **Bat** (always in your backpack) — knock out guards and creatures (they respawn later)
 4. Return to base → sell food at the Market Stall for Money
-5. Store food in a **Fridge** (upgrades level 1–10) to boost its sell value before cashing out
+5. Store food in your personal **Fridge** (levels 1–10, saved between sessions) to boost its sell value before cashing out
 6. Give food to teammates (**F** key near a player) or drop it (**G** key) for coordination
-7. At night: grab the **Flying Carpet** near the restaurant entrance to fly over walls
+7. At night: grab the **Flying Carpet** near the restaurant entrance to fly over walls (one carpet per player)
 8. Watch the sky — **Airplanes** occasionally fly over and drop free food
-9. Scores and money persist between sessions via DataStore
+9. Step on the purple **Sky Hotel** teleporter (south of the hotel) to reach the castle in the sky: healing food, a bonus chest and breakable walls
+10. Scores, money, upgrades, fridge level and carried food persist between sessions via DataStore
 
 ## Key Controls
 
 | Key | Action |
 |-----|--------|
-| E | Pick up food / use lift / interact with fridge |
+| E | Pick up food / use lift / store food in fridge / use machines and chests |
+| R (hold) | Upgrade your fridge (at a fridge) |
 | F | Give equipped food to nearest player (≤12 studs) |
 | G | Drop equipped food as world pickup |
 | WASD + Space / Shift | Fly while the Flying Carpet is equipped |
@@ -43,12 +45,14 @@ Use the lift platforms (press **E** on the lift) or the exterior staircase (east
 | Action                          | Reward                            |
 |---------------------------------|-----------------------------------|
 | Steal food item                 | +10 Score                         |
-| Store food in fridge            | +25 Score                         |
+| Store food in fridge            | +25 Score (once per item)         |
 | Sell food at stall              | +Money (varies by food type)      |
 | Fridge Level N sell bonus       | ×(1 + 0.3×N) on sell price        |
 | Collect air-dropped food        | No score bonus; sells at base price |
 | Buy Speed Boost                 | −100 Money                        |
 | Buy Jump Boost                  | −150 Money                        |
+
+You can carry at most 25 food items. The shop won't charge you once you're at the speed / jump cap (`Config.MAX_WALK_SPEED` / `MAX_JUMP_POWER`). Food from the **Food Multiplier** can't be multiplied again.
 
 ## Development Setup
 
@@ -82,13 +86,22 @@ src/
 │       ├── FoodInventory.lua       food give & drop between players
 │       ├── RefrigeratorSystem.lua  fridge levelling & sell-value bonus
 │       ├── FlyingCarpet.lua        night carpet spawn + server flight validation
-│       ├── AirplaneSystem.lua      fly-by airplanes with food drops
-│       └── HunterAI.lua            guard NPCs with pathfinding & catch logic
+│       ├── AirplaneSystem.lua      fly-by airplane schedule + food drops
+│       ├── HunterAI.lua            guard NPCs with pathfinding & catch logic
+│       ├── ChestSystem.lua         loot chests + server-validated guns
+│       ├── SkyHotel.lua            sky castle, healing food, teleporters
+│       ├── AmbientCreatures.lua    cosmetic dogs & cats
+│       ├── WorldPopulation.lua     places imported buildings, spawns outdoor enemies
+│       └── ToolUtil.lua            food-tool factory, IsFood checks, teleports
 ├── client/
 │   ├── Effects.client.lua          hit flash, sparkle FX, bat hit sound
 │   ├── FlyingCarpetClient.client.lua  carpet flight input (WASD + Space/Shift)
-│   ├── FridgeClient.client.lua     fridge UI, give/drop key bindings
-│   ├── Hud.client.lua              heads-up display
+│   ├── FridgeClient.client.lua     per-player fridge display, give/drop keys
+│   ├── Hud.client.lua              heads-up display + notification toasts
+│   ├── BatClient / WeaponClient    bat swing & gun input
+│   ├── AirplaneClient.client.lua   animates the fly-by airplane
+│   ├── AmbientBirds.client.lua     cosmetic birds
+│   ├── DayNightLighting.client.lua day/night colour blend
 │   └── DayNightUI.client.lua       day/night indicator
 └── shared/
     └── RemoteEvents.lua            centralised RemoteEvent definitions
@@ -99,7 +112,7 @@ src/
 | Trigger           | Action                                          |
 |-------------------|-------------------------------------------------|
 | Push to `main`    | Build & publish to Roblox via Open Cloud API    |
-| Open / update PR  | Rojo build check + Selene lint + StyLua format  |
+| Open / update PR  | Rojo build check + Selene lint + StyLua format + busted tests |
 
 Required GitHub secrets for the publish pipeline:
 

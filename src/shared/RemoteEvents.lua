@@ -44,19 +44,15 @@ local RemoteEvents = {
 
 	-- -----------------------------------------------------------------------
 	-- Refrigerator level system
+	-- (store / upgrade use server-side ProximityPrompts — no client remote)
 	-- -----------------------------------------------------------------------
-	-- Client → Server: upgrade a fridge to the next level (costs Money)
-	UpgradeFridge = getOrCreate(eventsFolder, "UpgradeFridge", "RemoteEvent"),
-	-- Client → Server: process equipped food in a fridge to boost its value
-	StoreFoodInFridge = getOrCreate(eventsFolder, "StoreFoodInFridge", "RemoteEvent"),
 	-- Server → Client: price breakdown popup after storing food
 	FridgeStoredFeedback = getOrCreate(eventsFolder, "FridgeStoredFeedback", "RemoteEvent"),
 
 	-- -----------------------------------------------------------------------
 	-- Flying carpet (night reward)
 	-- -----------------------------------------------------------------------
-	-- Client → Server: periodic position report while flying (for server validation)
-	CarpetPositionUpdate = getOrCreate(eventsFolder, "CarpetPositionUpdate", "RemoteEvent"),
+	-- (flight is validated by the server polling HumanoidRootPart — no client report)
 	-- Server → Client: tells the flying client their carpet was revoked (dawn)
 	CarpetRevoked = getOrCreate(eventsFolder, "CarpetRevoked", "RemoteEvent"),
 	-- Server → All Clients: carpet has spawned; show location hint
@@ -67,6 +63,14 @@ local RemoteEvents = {
 	-- -----------------------------------------------------------------------
 	-- Client → Server: player fired a weapon (server raycasts + applies damage)
 	ShootWeapon = getOrCreate(eventsFolder, "ShootWeapon", "RemoteEvent"),
+
+	-- -----------------------------------------------------------------------
+	-- UI / cosmetic
+	-- -----------------------------------------------------------------------
+	-- Server → Client: short toast message (cooldowns, purchases, warnings)
+	Notify = getOrCreate(eventsFolder, "Notify", "RemoteEvent"),
+	-- Server → All Clients: airplane flight parameters; clients animate the model
+	AirplaneFlight = getOrCreate(eventsFolder, "AirplaneFlight", "RemoteEvent"),
 
 	-- -----------------------------------------------------------------------
 	-- Server-to-server signal (BindableEvent — never replicated to clients)

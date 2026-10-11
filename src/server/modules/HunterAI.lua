@@ -2,28 +2,55 @@
 -- Spawns uniformed guard NPCs on Floor 1 of the restaurant.
 -- Guards react to the FoodStolenServer BindableEvent (fired by FoodSystem),
 -- chase the thief using PathfindingService, and catch them on close approach.
--- Catch consequence: food confiscated, player teleported to entrance, 3 s stun.
+-- Catch consequence: food confiscated, player teleported to entrance, short stun.
 --
 -- Guards differ from the creature AI (EnemyAI.lua):
 --   • Triggered by theft events, not "player has food"
 --   • Use PathfindingService to navigate around walls
 --   • Named, uniformed humanoids — visually distinct
+--
+-- Movement model: ONE controller loop per guard owns all MoveTo calls.
+-- Paths are cached and only recomputed when stale or when the target moved.
 
 local Players = game:GetService("Players")
 local PathfindingService = game:GetService("PathfindingService")
 
+local ToolUtil = require(script.Parent.ToolUtil)
+
 local HunterAI = {}
 
 local Config = nil
+local GameSystems = nil
+
+local TICK = 0.3 -- controller loop interval
+local PATH_MAX_AGE = 1.5 -- seconds before a chase path is recomputed
+local PATH_TARGET_DRIFT = 8 -- studs the target may move before recomputing
+local WAYPOINT_REACHED = 3 -- studs
 
 -- Guard name pool
 local GUARD_NAMES = { "Officer Rex", "Deputy Mal", "Constable Vex" }
 
--- guardData[model] = { state, target, targetLostAt, lastCatch, patrolGoal }
+-- guardData[model] = { state, target, chaseStartedAt, patrolGoal, path = { waypoints, index, target, computedAt } }
 local guardData = {}
 
 -- Per-player catch cooldowns to prevent double-catch by two guards simultaneously
-local playerCatchCooldowns = {} -- [userId] = tick()
+local playerCatchCooldowns = {} -- [userId] = os.clock()
+
+-- -------------------------------------------------------------------------
+-- Geometry helpers
+-- -------------------------------------------------------------------------
+local function floorY()
+	return Config.HOTEL_CENTER.Y + 2
+end
+
+local function insideHotelGroundFloor(position)
+	local c = Config.HOTEL_CENTER
+	local halfX = Config.HOTEL_SIZE.X / 2
+	local halfZ = Config.HOTEL_SIZE.Z / 2
+	return math.abs(position.X - c.X) < halfX
+		and math.abs(position.Z - c.Z) < halfZ
+		and position.Y < c.Y + Config.FLOOR_HEIGHT
+end
 
 -- -------------------------------------------------------------------------
 -- Model construction
@@ -108,24 +135,34 @@ local function buildGuard(name, startPos)
 	humanoid.Parent = model
 
 	model.Parent = workspace
+	ToolUtil.claimNetworkOwnership(torso)
 	return model, torso, humanoid
 end
 
 -- -------------------------------------------------------------------------
 -- Catch a thief: confiscate food, teleport, stun
 -- -------------------------------------------------------------------------
-local function isProtectedTool(item)
-	if not item or not item:IsA("Tool") then
-		return true
-	end
-	local h = item:FindFirstChild("Handle")
-	return h and (h:GetAttribute("IsBat") == true or h:GetAttribute("IsCarpet") == true)
+local function stunPlayer(player, humanoid)
+	humanoid:SetAttribute("Stunned", true)
+	humanoid.WalkSpeed = 0
+	humanoid.JumpPower = 0
+	task.delay(Config.GUARD_STUN_TIME or 3, function()
+		if humanoid.Parent then
+			humanoid:SetAttribute("Stunned", nil)
+		end
+		-- Restore the player's saved (possibly upgraded) movement values,
+		-- including any purchase made during the stun
+		if GameSystems then
+			GameSystems.applySettings(player)
+		end
+	end)
 end
 
 local function catchPlayer(guardModel, player)
 	-- Per-player cooldown prevents two guards double-catching simultaneously
-	local now = tick()
-	if now - (playerCatchCooldowns[player.UserId] or 0) < 5 then
+	local now = os.clock()
+	local last = playerCatchCooldowns[player.UserId]
+	if last and now - last < 5 then
 		return
 	end
 	playerCatchCooldowns[player.UserId] = now
@@ -134,6 +171,7 @@ local function catchPlayer(guardModel, player)
 	if data then
 		data.state = "RETURN"
 		data.target = nil
+		data.path = nil
 	end
 
 	local char = player.Character
@@ -141,52 +179,25 @@ local function catchPlayer(guardModel, player)
 		return
 	end
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	local hrp = char:FindFirstChild("HumanoidRootPart")
 
-	-- 1. Confiscate food tools (spare bat and carpet)
-	local equipped = char:FindFirstChildOfClass("Tool")
-	if equipped and not isProtectedTool(equipped) then
-		equipped:Destroy()
-	end
-	for _, item in ipairs(player.Backpack:GetChildren()) do
-		if item:IsA("Tool") and not isProtectedTool(item) then
-			item:Destroy()
-		end
-	end
+	-- 1. Confiscate food tools (bat, carpet and weapons are kept)
+	ToolUtil.confiscateFood(player)
 
 	-- 2. Teleport to restaurant entrance (south face of hotel, floor 1)
-	if hrp then
-		local cx = Config.HOTEL_CENTER.X
-		local cy = Config.HOTEL_CENTER.Y
-		local cz = Config.HOTEL_CENTER.Z
-		local halfZ = Config.HOTEL_SIZE.Z / 2
-		hrp.CFrame = CFrame.new(cx, cy + 3, cz - halfZ + 12)
-	end
+	local c = Config.HOTEL_CENTER
+	local halfZ = Config.HOTEL_SIZE.Z / 2
+	ToolUtil.teleport(player, CFrame.new(c.X, c.Y + 3, c.Z - halfZ + 12))
 
-	-- 3. Stun for 3 seconds (zero speed; restore after delay)
+	-- 3. Stun
 	if humanoid then
-		local savedSpeed = humanoid.WalkSpeed
-		local savedJump = humanoid.JumpPower
-		humanoid.WalkSpeed = 0
-		humanoid.JumpPower = 0
-		task.delay(3, function()
-			-- Re-read character in case player respawned during stun
-			local c2 = player.Character
-			if c2 then
-				local h2 = c2:FindFirstChildOfClass("Humanoid")
-				if h2 then
-					h2.WalkSpeed = savedSpeed
-					h2.JumpPower = savedJump
-				end
-			end
-		end)
+		stunPlayer(player, humanoid)
 	end
 end
 
 -- -------------------------------------------------------------------------
--- Pathfinding chase step
+-- Path following (non-blocking; called once per controller tick)
 -- -------------------------------------------------------------------------
-local function chaseStep(humanoid, fromPos, toPos)
+local function computePath(fromPos, toPos)
 	local path = PathfindingService:CreatePath({
 		AgentRadius = 1.5,
 		AgentHeight = 5,
@@ -194,123 +205,164 @@ local function chaseStep(humanoid, fromPos, toPos)
 		AgentCanClimb = false,
 		WaypointSpacing = 2,
 	})
-
 	local ok = pcall(function()
 		path:ComputeAsync(fromPos, toPos)
 	end)
-
 	if not ok or path.Status ~= Enum.PathStatus.Success then
-		-- Fallback: direct move if pathfinding fails
-		humanoid:MoveTo(toPos)
-		return
+		return nil
+	end
+	return path:GetWaypoints()
+end
+
+local function followPath(data, humanoid, torso, targetPos)
+	local now = os.clock()
+	local p = data.path
+	local stale = not p
+		or now - p.computedAt > PATH_MAX_AGE
+		or (targetPos - p.target).Magnitude > PATH_TARGET_DRIFT
+		or p.index > #p.waypoints
+
+	if stale then
+		local waypoints = computePath(torso.Position, targetPos)
+		if not waypoints or #waypoints < 2 then
+			-- Fallback: direct move if pathfinding fails
+			data.path = nil
+			humanoid:MoveTo(targetPos)
+			return
+		end
+		-- Waypoint 1 is the guard's own position
+		p = { waypoints = waypoints, index = 2, target = targetPos, computedAt = now }
+		data.path = p
 	end
 
-	for _, wp in ipairs(path:GetWaypoints()) do
-		if wp.Action == Enum.PathWaypointAction.Jump then
-			humanoid.Jump = true
+	-- Skip waypoints we've already reached
+	while p.index <= #p.waypoints do
+		local wp = p.waypoints[p.index]
+		local flat = Vector3.new(wp.Position.X, torso.Position.Y, wp.Position.Z)
+		if (flat - torso.Position).Magnitude > WAYPOINT_REACHED then
+			break
 		end
+		p.index = p.index + 1
+	end
+
+	local wp = p.waypoints[p.index]
+	if wp then
 		humanoid:MoveTo(wp.Position)
-		-- MoveToFinished has a built-in 4-second timeout
-		humanoid.MoveToFinished:Wait()
+	else
+		humanoid:MoveTo(targetPos)
 	end
 end
 
 -- -------------------------------------------------------------------------
--- AI loop for one guard
+-- Per-guard controller
 -- -------------------------------------------------------------------------
-local function startAI(model, torso, humanoid)
+local function endChase(data)
+	data.state = "RETURN"
+	data.target = nil
+	data.path = nil
+end
+
+local function stepGuard(model, data, torso, humanoid)
+	if data.state == "PATROL" then
+		humanoid.WalkSpeed = Config.GUARD_PATROL_SPEED
+		-- Pick a new wander goal when the current one is reached or unreachable
+		local now = os.clock()
+		if (torso.Position - data.patrolGoal).Magnitude < 4 or now - (data.patrolSince or 0) > 10 then
+			local c = Config.HOTEL_CENTER
+			local angle = math.random() * math.pi * 2
+			local radius = math.random(10, 50)
+			data.patrolGoal = Vector3.new(c.X + math.cos(angle) * radius, floorY(), c.Z + math.sin(angle) * radius)
+			data.patrolSince = now
+		end
+		-- Re-issuing the same goal is cheap and survives MoveTo's 8 s timeout
+		humanoid:MoveTo(data.patrolGoal)
+	elseif data.state == "CHASE" then
+		humanoid.WalkSpeed = Config.GUARD_CHASE_SPEED
+
+		local target = data.target
+		local targetHRP = target
+			and target.Parent
+			and target.Character
+			and target.Character:FindFirstChild("HumanoidRootPart")
+		if not targetHRP then
+			endChase(data)
+			return
+		end
+
+		local targetPos = targetHRP.Position
+		local dist = (targetPos - torso.Position).Magnitude
+		local timedOut = os.clock() - data.chaseStartedAt > Config.GUARD_CHASE_TIMEOUT
+		-- Give up when the thief escapes the ground floor, outruns the guard, or time runs out
+		if timedOut or dist > Config.GUARD_LOSE_RANGE or not insideHotelGroundFloor(targetPos) then
+			endChase(data)
+			return
+		end
+
+		if dist <= Config.GUARD_CATCH_RANGE then
+			catchPlayer(model, target)
+		else
+			followPath(data, humanoid, torso, targetPos)
+		end
+	elseif data.state == "RETURN" then
+		humanoid.WalkSpeed = Config.GUARD_PATROL_SPEED
+		local home = Vector3.new(Config.HOTEL_CENTER.X, floorY(), Config.HOTEL_CENTER.Z)
+		if (torso.Position - home).Magnitude < 10 then
+			data.state = "PATROL"
+			data.patrolGoal = torso.Position
+		else
+			followPath(data, humanoid, torso, home)
+		end
+	end
+end
+
+local function spawnGuard(name, pos)
+	local model, torso, humanoid = buildGuard(name, pos)
+
+	local data = {
+		state = "PATROL",
+		target = nil,
+		chaseStartedAt = 0,
+		patrolGoal = torso.Position,
+		path = nil,
+	}
+	guardData[model] = data
+
 	local alive = true
+	local function stop()
+		if not alive then
+			return
+		end
+		alive = false
+		guardData[model] = nil
+	end
+
 	model.AncestryChanged:Connect(function()
 		if not model.Parent then
-			alive = false
+			stop()
 		end
 	end)
 
-	guardData[model] = {
-		state = "PATROL",
-		target = nil,
-		targetLostAt = nil,
-		patrolGoal = torso.Position,
-	}
+	-- Defeated guards stop acting immediately and respawn later
+	humanoid.Died:Connect(function()
+		stop()
+		task.delay(3, function()
+			if model.Parent then
+				model:Destroy()
+			end
+		end)
+		task.delay(Config.GUARD_RESPAWN_TIME, function()
+			spawnGuard(name, pos)
+		end)
+	end)
 
 	task.spawn(function()
 		while alive do
-			task.wait(0.3)
-			if not (model.Parent and humanoid) then
+			task.wait(TICK)
+			if not alive or humanoid.Health <= 0 then
 				break
 			end
-
-			local data = guardData[model]
-			if not data then
-				break
-			end
-
-			-- ── PATROL ──────────────────────────────────────────────────
-			if data.state == "PATROL" then
-				humanoid.WalkSpeed = Config.GUARD_PATROL_SPEED
-				-- Pick a new wander goal when close to current one
-				local dist = (torso.Position - data.patrolGoal).Magnitude
-				if dist < 4 then
-					local cx = Config.HOTEL_CENTER.X
-					local cz = Config.HOTEL_CENTER.Z
-					local floorY = Config.HOTEL_CENTER.Y + 2
-					local angle = math.random() * math.pi * 2
-					local radius = math.random(10, 50)
-					data.patrolGoal = Vector3.new(cx + math.cos(angle) * radius, floorY, cz + math.sin(angle) * radius)
-				end
-				humanoid:MoveTo(data.patrolGoal)
-
-			-- ── CHASE ────────────────────────────────────────────────────
-			elseif data.state == "CHASE" then
-				humanoid.WalkSpeed = Config.GUARD_CHASE_SPEED
-
-				local target = data.target
-				if not target or not target.Character then
-					-- Lost the target
-					data.state = "RETURN"
-					data.target = nil
-				else
-					local targetChar = target.Character
-					local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-					if targetHRP then
-						local d = (targetHRP.Position - torso.Position).Magnitude
-						if d <= Config.GUARD_CATCH_RANGE then
-							catchPlayer(model, target)
-						else
-							-- Pathfind toward target; update lose timer
-							task.spawn(function()
-								chaseStep(humanoid, torso.Position, targetHRP.Position)
-							end)
-							data.targetLostAt = nil
-						end
-					else
-						-- Target respawned / no HRP
-						if not data.targetLostAt then
-							data.targetLostAt = tick()
-						elseif tick() - data.targetLostAt > Config.GUARD_CHASE_TIMEOUT then
-							data.state = "RETURN"
-							data.target = nil
-						end
-					end
-				end
-
-			-- ── RETURN ───────────────────────────────────────────────────
-			elseif data.state == "RETURN" then
-				humanoid.WalkSpeed = Config.GUARD_PATROL_SPEED
-				-- Return to a central patrol area then switch back to PATROL
-				local cx = Config.HOTEL_CENTER.X
-				local cz = Config.HOTEL_CENTER.Z
-				local floorY = Config.HOTEL_CENTER.Y + 2
-				humanoid:MoveTo(Vector3.new(cx, floorY, cz))
-				local dist = (torso.Position - Vector3.new(cx, floorY, cz)).Magnitude
-				if dist < 10 then
-					data.state = "PATROL"
-				end
-			end
+			stepGuard(model, data, torso, humanoid)
 		end
-
-		-- Cleanup when guard is destroyed
-		guardData[model] = nil
 	end)
 end
 
@@ -318,21 +370,20 @@ end
 -- Public API
 -- -------------------------------------------------------------------------
 
-function HunterAI.init(remoteEvents, config)
+function HunterAI.init(remoteEvents, config, gameSystems)
 	Config = config
+	GameSystems = gameSystems
 
 	-- Listen for theft events from FoodSystem
 	remoteEvents.FoodStolenServer.Event:Connect(function(player, foodPos)
 		for model, data in pairs(guardData) do
-			if data.state == "PATROL" then
+			if data.state ~= "CHASE" then
 				local torso = model.PrimaryPart
-				if torso then
-					local dist = (torso.Position - foodPos).Magnitude
-					if dist <= Config.GUARD_ALERT_RANGE then
-						data.state = "CHASE"
-						data.target = player
-						data.targetLostAt = nil
-					end
+				if torso and (torso.Position - foodPos).Magnitude <= Config.GUARD_ALERT_RANGE then
+					data.state = "CHASE"
+					data.target = player
+					data.chaseStartedAt = os.clock()
+					data.path = nil
 				end
 			end
 		end
@@ -345,18 +396,14 @@ function HunterAI.init(remoteEvents, config)
 end
 
 function HunterAI.spawnAll()
-	local floorY = Config.HOTEL_CENTER.Y + 2
-
 	for i = 1, Config.GUARD_COUNT do
 		local angle = (math.pi * 2 / Config.GUARD_COUNT) * i
 		local pos = Vector3.new(
 			Config.HOTEL_CENTER.X + math.cos(angle) * 40,
-			floorY,
+			floorY(),
 			Config.HOTEL_CENTER.Z + math.sin(angle) * 40
 		)
-		local name = GUARD_NAMES[((i - 1) % #GUARD_NAMES) + 1]
-		local model, torso, humanoid = buildGuard(name, pos)
-		startAI(model, torso, humanoid)
+		spawnGuard(GUARD_NAMES[((i - 1) % #GUARD_NAMES) + 1], pos)
 	end
 end
 

@@ -15,7 +15,8 @@ local ShootWeapon = eventsFolder:WaitForChild("ShootWeapon")
 
 local WEAPON_NAMES = { Pistol = true, Rifle = true }
 
-local activatedConn = nil
+-- One Activated connection per tool lifetime (Activated only fires while equipped)
+local hookedTools = setmetatable({}, { __mode = "k" })
 
 -- -------------------------------------------------------------------------
 -- Crosshair UI
@@ -118,31 +119,19 @@ local function hideCrosshair()
 end
 
 -- -------------------------------------------------------------------------
--- Hook a weapon tool's Activated event
+-- Hook a weapon tool's Activated event (once per tool)
 -- -------------------------------------------------------------------------
+local function isWeapon(item)
+	return item:IsA("Tool") and WEAPON_NAMES[item.Name] == true
+end
+
 local function hookWeaponTool(tool)
-	if not WEAPON_NAMES[tool.Name] then
+	if hookedTools[tool] then
 		return
 	end
+	hookedTools[tool] = true
 
-	if activatedConn then
-		activatedConn:Disconnect()
-		activatedConn = nil
-	end
-
-	tool.Equipped:Connect(function()
-		showCrosshair(tool.Name)
-	end)
-
-	tool.Unequipped:Connect(function()
-		hideCrosshair()
-		if activatedConn then
-			activatedConn:Disconnect()
-			activatedConn = nil
-		end
-	end)
-
-	activatedConn = tool.Activated:Connect(function()
+	tool.Activated:Connect(function()
 		-- Send tool name + camera look vector; server re-validates everything
 		local cam = workspace.CurrentCamera
 		local aimDir = cam and cam.CFrame.LookVector or Vector3.new(0, 0, -1)
@@ -151,17 +140,28 @@ local function hookWeaponTool(tool)
 end
 
 -- -------------------------------------------------------------------------
--- Watch the character for weapon tools being equipped
+-- A Tool parented to the character is equipped; removed means unequipped.
+-- Activated only fires while equipped, so watching the character suffices.
 -- -------------------------------------------------------------------------
 local function onCharacterAdded(character)
-	local existing = character:FindFirstChildOfClass("Tool")
-	if existing then
-		hookWeaponTool(existing)
+	hideCrosshair()
+
+	for _, child in ipairs(character:GetChildren()) do
+		if isWeapon(child) then
+			hookWeaponTool(child)
+			showCrosshair(child.Name)
+		end
 	end
 
 	character.ChildAdded:Connect(function(child)
-		if child:IsA("Tool") then
+		if isWeapon(child) then
 			hookWeaponTool(child)
+			showCrosshair(child.Name)
+		end
+	end)
+	character.ChildRemoved:Connect(function(child)
+		if isWeapon(child) then
+			hideCrosshair()
 		end
 	end)
 end

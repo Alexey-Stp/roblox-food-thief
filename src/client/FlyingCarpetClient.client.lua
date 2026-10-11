@@ -1,89 +1,101 @@
 -- FlyingCarpetClient.client.lua  (LocalScript in StarterPlayerScripts)
--- Drives flight when the player has the FlyingCarpet Tool equipped.
+-- Drives flight while a carpet Tool (handle attribute IsCarpet) is equipped.
 -- Movement:
 --   W/A/S/D  — camera-relative horizontal flight
 --   Space    — ascend
 --   LeftShift— descend
 -- Uses LinearVelocity + AlignOrientation constraints for smooth physics.
--- Periodically sends the local HumanoidRootPart position to the server
--- (CarpetPositionUpdate) so it can validate speed and height.
+-- The server validates flight by sampling the HumanoidRootPart itself
+-- (FlyingCarpet.lua); this script sends nothing.
+-- Flight tuning comes from attributes the server puts on the carpet handle.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Debris = game:GetService("Debris")
 
 local localPlayer = Players.LocalPlayer
 
--- Wait for RemoteEvents to be created by the server
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local eventsFolder = Shared:WaitForChild("Events")
-local CarpetPositionUpdate = eventsFolder:WaitForChild("CarpetPositionUpdate")
 local CarpetRevoked = eventsFolder:WaitForChild("CarpetRevoked")
 local CarpetSpawned = eventsFolder:WaitForChild("CarpetSpawned")
 
-local FLIGHT_SPEED = 60 -- horizontal studs/sec (matches Config.CARPET_FLIGHT_SPEED)
-local ASCENT_SPEED = 15 -- vertical studs/sec   (matches Config.CARPET_ASCENT_SPEED)
+local DEFAULT_FLIGHT_SPEED = 60
+local DEFAULT_ASCENT_SPEED = 15
 local DESCENT_SPEED = 8 -- gentle fall when pressing Shift
 
 -- -------------------------------------------------------------------------
 -- Active flight state
 -- -------------------------------------------------------------------------
-local flightConnection = nil
-local flightAttachment = nil
-local flightLinearVel = nil
-local flightAlignOrient = nil
-local reportTimer = 0
-local REPORT_INTERVAL = 0.1 -- seconds between server position reports
+local flight = nil -- { connection, attachment, linearVel, alignOrient, character }
 
--- -------------------------------------------------------------------------
--- Start / stop flight using constraint-based physics
--- -------------------------------------------------------------------------
-local function startFlight(character)
-	if flightConnection then
+local function isCarpetTool(item)
+	if not item:IsA("Tool") then
+		return false
+	end
+	local h = item:FindFirstChild("Handle")
+	return h ~= nil and h:GetAttribute("IsCarpet") == true
+end
+
+local function stopFlight()
+	if not flight then
 		return
-	end -- already flying
+	end
+	flight.connection:Disconnect()
+	flight.linearVel:Destroy()
+	flight.alignOrient:Destroy()
+	flight.attachment:Destroy()
 
-	local hrp = character:WaitForChild("HumanoidRootPart")
-	local humanoid = character:WaitForChild("Humanoid")
+	-- Zero out residual velocity as a safety net
+	local hrp = flight.character:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		hrp.AssemblyLinearVelocity = Vector3.zero
+	end
+	flight = nil
+end
 
-	humanoid.PlatformStand = false
+local function startFlight(character, carpetTool)
+	if flight then
+		return
+	end
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	local handle = carpetTool:FindFirstChild("Handle")
+	if not hrp or not handle then
+		return
+	end
 
-	-- Attachment anchored to HRP (required by both constraints)
-	flightAttachment = Instance.new("Attachment")
-	flightAttachment.Name = "FlightAttachment"
-	flightAttachment.Parent = hrp
+	local flightSpeed = handle:GetAttribute("FlightSpeed") or DEFAULT_FLIGHT_SPEED
+	local ascentSpeed = handle:GetAttribute("AscentSpeed") or DEFAULT_ASCENT_SPEED
+	local maxHeight = handle:GetAttribute("MaxHeight")
+
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "FlightAttachment"
+	attachment.Parent = hrp
 
 	-- LinearVelocity drives movement; MaxForce overrides gravity/friction
-	flightLinearVel = Instance.new("LinearVelocity")
-	flightLinearVel.Attachment0 = flightAttachment
-	flightLinearVel.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
-	flightLinearVel.RelativeTo = Enum.ActuatorRelativeTo.World
-	flightLinearVel.MaxForce = 1e6
-	flightLinearVel.VectorVelocity = Vector3.zero
-	flightLinearVel.Parent = hrp
+	local linearVel = Instance.new("LinearVelocity")
+	linearVel.Attachment0 = attachment
+	linearVel.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+	linearVel.RelativeTo = Enum.ActuatorRelativeTo.World
+	linearVel.MaxForce = 1e6
+	linearVel.VectorVelocity = Vector3.zero
+	linearVel.Parent = hrp
 
 	-- AlignOrientation keeps the character upright (no tumbling during flight)
-	flightAlignOrient = Instance.new("AlignOrientation")
-	flightAlignOrient.Attachment0 = flightAttachment
-	flightAlignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment
-	flightAlignOrient.MaxTorque = 1e6
-	flightAlignOrient.Responsiveness = 10
-	flightAlignOrient.CFrame = CFrame.new() -- world-up aligned
-	flightAlignOrient.Parent = hrp
+	local alignOrient = Instance.new("AlignOrientation")
+	alignOrient.Attachment0 = attachment
+	alignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	alignOrient.MaxTorque = 1e6
+	alignOrient.Responsiveness = 10
+	alignOrient.CFrame = CFrame.new()
+	alignOrient.Parent = hrp
 
-	flightConnection = RunService.Heartbeat:Connect(function(dt)
-		-- Stop if carpet was removed
-		if not character:FindFirstChild("FlyingCarpet") then
-			stopFlight(character) -- defined below; forward reference is fine in Lua
-			return
-		end
-
-		-- Camera-relative horizontal direction
+	local connection = RunService.Heartbeat:Connect(function()
 		local cam = workspace.CurrentCamera
 		local forward = Vector3.new(cam.CFrame.LookVector.X, 0, cam.CFrame.LookVector.Z)
 		local right = Vector3.new(cam.CFrame.RightVector.X, 0, cam.CFrame.RightVector.Z)
-
 		if forward.Magnitude > 0 then
 			forward = forward.Unit
 		end
@@ -110,135 +122,101 @@ local function startFlight(character)
 
 		local vertical = 0
 		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-			vertical = ASCENT_SPEED
+			-- Stop climbing at the server's height cap instead of being rubber-banded
+			if not maxHeight or hrp.Position.Y < maxHeight then
+				vertical = ascentSpeed
+			end
 		elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
 			vertical = -DESCENT_SPEED
 		end
 
-		flightLinearVel.VectorVelocity = moveDir * FLIGHT_SPEED + Vector3.new(0, vertical, 0)
-
-		-- Periodic position report to server for validation
-		reportTimer = reportTimer + dt
-		if reportTimer >= REPORT_INTERVAL then
-			reportTimer = 0
-			CarpetPositionUpdate:FireServer(hrp.Position)
-		end
+		linearVel.VectorVelocity = moveDir * flightSpeed + Vector3.new(0, vertical, 0)
 	end)
-end
 
-function stopFlight(character)
-	if flightConnection then
-		flightConnection:Disconnect()
-		flightConnection = nil
-	end
-	if flightLinearVel then
-		flightLinearVel:Destroy()
-		flightLinearVel = nil
-	end
-	if flightAlignOrient then
-		flightAlignOrient:Destroy()
-		flightAlignOrient = nil
-	end
-	if flightAttachment then
-		flightAttachment:Destroy()
-		flightAttachment = nil
-	end
-	-- Zero out residual velocity as a safety net
-	local hrp = character and character:FindFirstChild("HumanoidRootPart")
-	if hrp then
-		hrp.AssemblyLinearVelocity = Vector3.zero
-	end
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.PlatformStand = false
-	end
+	flight = {
+		connection = connection,
+		attachment = attachment,
+		linearVel = linearVel,
+		alignOrient = alignOrient,
+		character = character,
+	}
 end
 
 -- -------------------------------------------------------------------------
--- Watch for the FlyingCarpet Tool in the character
+-- A Tool parented to the character is equipped; removed means unequipped.
+-- One ChildAdded/ChildRemoved pair per character — no per-equip connections.
 -- -------------------------------------------------------------------------
 local function onCharacterAdded(character)
-	-- Check for carpet already equipped (unlikely on spawn, but safe)
-	local existing = character:FindFirstChild("FlyingCarpet")
-	if existing and existing:IsA("Tool") then
-		existing.Equipped:Connect(function()
-			startFlight(character)
-		end)
-		existing.Unequipped:Connect(function()
-			stopFlight(character)
-		end)
+	stopFlight()
+
+	for _, child in ipairs(character:GetChildren()) do
+		if isCarpetTool(child) then
+			startFlight(character, child)
+		end
 	end
 
-	-- Watch for carpet being added later
 	character.ChildAdded:Connect(function(child)
-		if child.Name == "FlyingCarpet" and child:IsA("Tool") then
-			child.Equipped:Connect(function()
-				startFlight(character)
-			end)
-			child.Unequipped:Connect(function()
-				stopFlight(character)
-			end)
+		if isCarpetTool(child) then
+			startFlight(character, child)
+		end
+	end)
+	character.ChildRemoved:Connect(function(child)
+		if flight and flight.character == character and isCarpetTool(child) then
+			stopFlight()
 		end
 	end)
 end
 
 -- -------------------------------------------------------------------------
--- Server tells us the carpet was revoked (dawn arrived)
+-- Banner helper
 -- -------------------------------------------------------------------------
-CarpetRevoked.OnClientEvent:Connect(function()
-	stopFlight(localPlayer.Character)
+local function showBanner(name, text, textColor, bgColor, lifetime)
 	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "CarpetRevokedGui"
-	screenGui.ResetOnSpawn = false
-	screenGui.Parent = localPlayer.PlayerGui
-
-	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(0, 400, 0, 60)
-	frame.Position = UDim2.new(0.5, -200, 0.15, 0)
-	frame.BackgroundColor3 = Color3.fromRGB(40, 20, 0)
-	frame.BackgroundTransparency = 0.3
-	frame.BorderSizePixel = 0
-	frame.Parent = screenGui
-
-	local lbl = Instance.new("TextLabel")
-	lbl.Size = UDim2.new(1, 0, 1, 0)
-	lbl.Text = "The flying carpet vanished at dawn!"
-	lbl.TextColor3 = Color3.fromRGB(255, 180, 50)
-	lbl.BackgroundTransparency = 1
-	lbl.TextScaled = true
-	lbl.Font = Enum.Font.SourceSansBold
-	lbl.Parent = frame
-
-	game:GetService("Debris"):AddItem(screenGui, 5)
-end)
-
--- -------------------------------------------------------------------------
--- Server tells all clients the carpet spawned
--- -------------------------------------------------------------------------
-CarpetSpawned.OnClientEvent:Connect(function()
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "CarpetSpawnedGui"
+	screenGui.Name = name
 	screenGui.ResetOnSpawn = false
 	screenGui.Parent = localPlayer.PlayerGui
 
 	local frame = Instance.new("Frame")
 	frame.Size = UDim2.new(0, 420, 0, 60)
 	frame.Position = UDim2.new(0.5, -210, 0.15, 0)
-	frame.BackgroundColor3 = Color3.fromRGB(20, 0, 60)
+	frame.BackgroundColor3 = bgColor
 	frame.BackgroundTransparency = 0.3
 	frame.BorderSizePixel = 0
 	frame.Parent = screenGui
 
 	local lbl = Instance.new("TextLabel")
 	lbl.Size = UDim2.new(1, 0, 1, 0)
-	lbl.Text = "A Flying Carpet appeared near the restaurant!"
-	lbl.TextColor3 = Color3.fromRGB(180, 130, 255)
+	lbl.Text = text
+	lbl.TextColor3 = textColor
 	lbl.BackgroundTransparency = 1
 	lbl.TextScaled = true
 	lbl.Font = Enum.Font.SourceSansBold
 	lbl.Parent = frame
 
-	game:GetService("Debris"):AddItem(screenGui, 8)
+	Debris:AddItem(screenGui, lifetime)
+end
+
+-- Server tells us the night carpet was revoked (dawn arrived)
+CarpetRevoked.OnClientEvent:Connect(function()
+	stopFlight()
+	showBanner(
+		"CarpetRevokedGui",
+		"The flying carpet vanished at dawn!",
+		Color3.fromRGB(255, 180, 50),
+		Color3.fromRGB(40, 20, 0),
+		5
+	)
+end)
+
+-- Server tells all clients the night carpet spawned
+CarpetSpawned.OnClientEvent:Connect(function()
+	showBanner(
+		"CarpetSpawnedGui",
+		"A Flying Carpet appeared near the restaurant!",
+		Color3.fromRGB(180, 130, 255),
+		Color3.fromRGB(20, 0, 60),
+		8
+	)
 end)
 
 -- -------------------------------------------------------------------------
